@@ -1,0 +1,59 @@
+---
+title: "Data Cleaning"
+output: html_notebook
+---
+
+This R Notebook records the exploratory analysis taken to support the data cleaning steps taken in the "Data Cleaning Interface" R Script 
+
+```{r setup, include=FALSE}
+proj_dir = rprojroot::find_rstudio_root_file()
+knitr::opts_knit$set(root.dir = proj_dir)
+```
+
+# 1. Data Cleaning
+
+```{r, include=FALSE}
+source("00 source.R")
+source("01 Data Cleaning/Data Cleaning Interface.R")
+
+```
+
+
+```{r}
+ass_data%>%
+  mutate(policylen =ass_data$expirydate - ass_data$effectdate )%>%
+  count(policylen)
+```
+
+```{r}
+any(is.na(ass_data$sprinkler_type))
+any(is.na(ass_data$property_cover))
+any(is.na(ass_data$LossofIncome_cover))
+```
+
+Check that the epy values are accurate
+
+```{r}
+pacman::p_load(lubridate)
+epy_data = ass_data$epy
+epy_calc = days_in_month(ymd(
+  paste0(ass_data$ym,"-", ass_data$xm, "-01"))) / 365
+
+epy_diff = epy_calc - epy_data
+
+stopifnot(min(epy_diff) > 0)
+ass_data[epy_diff > 0.06,c("effectdate","expirydate","start","ym","xm","epy")]
+
+```
+
+What percentage of the property cover, has building items being NA?
+
+```{r}
+ass_copy%>%
+  mutate(building_na = is.na(building_type)| is.na(building_age))%>%
+  group_by(building_na)%>%
+  summarise(
+    count = n(),
+    .groups = "keep"
+  )
+```
