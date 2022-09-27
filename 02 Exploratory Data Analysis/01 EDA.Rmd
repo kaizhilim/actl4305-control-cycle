@@ -1,0 +1,19 @@
+---
+title: "Exploratory Data Analysis"
+output: html_notebook
+---
+
+This R Notebook records the exploratory analysis to fulfil the part 1 requirements of the ACTL4305 Assignment
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+```
+
+
+```{r, include=FALSE}
+source("00 source.R")
+load("00 envr/Compulsory/ass_copy.R")
+load("00 envr/Compulsory/policy_df.R")
+
+```
+

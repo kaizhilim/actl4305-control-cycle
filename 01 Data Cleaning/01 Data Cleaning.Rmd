@@ -14,7 +14,8 @@ knitr::opts_knit$set(root.dir = proj_dir)
 
 ```{r, include=FALSE}
 source("00 source.R")
-source("01 Data Cleaning/Data Cleaning Interface.R")
+load("00 envr/Compulsory/ass_copy.R")
+load("00 envr/Compulsory/policy_df.R")
 
 ```
 
@@ -46,6 +47,10 @@ ass_data[epy_diff > 0.06,c("effectdate","expirydate","start","ym","xm","epy")]
 
 ```
 
+# 2. Cleaned Data Checks
+
+## NA Checks
+
 What percentage of the property cover, has building items being NA?
 
 ```{r}
@@ -57,3 +62,28 @@ ass_copy%>%
     .groups = "keep"
   )
 ```
+
+# 3. Policy data Checks
+
+For policies with duplicated policyno, situation_num, policy date ranges and accident months, why is this the case?
+
+* LossofIncome_cover was purchased
+* riskpostcode was changed
+
+```{r}
+policy_df%>%
+    group_by(policyno, situation_num, effectdate, expirydate,
+             ym, xm)%>%
+    filter(n()>1)
+```
+
+## Cancellation
+
+```{r}
+policy_df%>%
+  mutate(diff = expirydate - as.Date(paste0(ym,"-", xm, "-01")))%>%
+  group_by(diff)%>%
+  tally()%>%
+  arrange(desc(diff))
+```
+
