@@ -35,7 +35,7 @@ any(is.na(ass_data$LossofIncome_cover))
 Check that the epy values are accurate
 
 ```{r}
-pacman::p_load(lubridate)
+library(lubridate)
 epy_data = ass_data$epy
 epy_calc = days_in_month(ymd(
   paste0(ass_data$ym,"-", ass_data$xm, "-01"))) / 365

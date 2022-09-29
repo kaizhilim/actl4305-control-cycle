@@ -9,7 +9,8 @@ package_list = c(
   "tidyverse",
   "lubridate",
   "formattable",
-  "naniar"
+  "naniar",
+  "rprojroot"
 )
 
 new_package_list = package_list[
