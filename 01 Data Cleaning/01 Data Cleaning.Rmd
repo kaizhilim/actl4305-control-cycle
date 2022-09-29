@@ -8,6 +8,7 @@ This R Notebook records the exploratory analysis taken to support the data clean
 ```{r setup, include=FALSE}
 proj_dir = rprojroot::find_rstudio_root_file()
 knitr::opts_knit$set(root.dir = proj_dir)
+options(scipen=7)
 ```
 
 # 1. Data Cleaning
@@ -16,7 +17,6 @@ knitr::opts_knit$set(root.dir = proj_dir)
 source("00 source.R")
 load("00 envr/Compulsory/ass_copy.R")
 load("00 envr/Compulsory/policy_df.R")
-
 ```
 
 
@@ -63,6 +63,46 @@ ass_copy%>%
   )
 ```
 
+# All variables - number of missing values and unique values
+```{r}
+data_check <- ass_copy %>%
+  summarise(across(everything(),n_distinct)) %>%
+  bind_rows(colSums(is.na(ass_copy)))%>%
+  mutate(rowname = c("Unique Values", "Missing Values"))%>%
+  pivot_longer(-rowname, names_to = "col")%>%
+  pivot_wider(names_from = rowname, values_from = value)
+formattable(data_check)
+```
+
+# Visualisation of how many NA values for each variable
+
+```{r}
+ass_copy %>%
+  miss_var_summary() %>%
+  mutate(missing = n_miss > 0) %>%
+  ggplot(aes(x = stats::reorder(variable, n_miss),
+             y = n_miss,
+             colour = missing,
+             fill = missing)) +
+  geom_bar(stat = "identity",
+           position = "dodge",
+           width = 0) + 
+  geom_point() +
+  coord_flip() +
+  scale_colour_manual(values = c("#8E9796", "#484878")) +
+  scale_fill_manual(values = c("#8E9796", "#484878")) +
+  labs(y = "# Missing",
+       x = "Variables") +
+  theme_minimal() +
+  theme(legend.position = "none") 
+
+
+```
+# Plot interactions of NA across variables
+```{r}
+gg_miss_upset(ass_copy, nsets=7, nintersects=NA)
+```
+
 # 3. Policy data Checks
 
 For policies with duplicated policyno, situation_num, policy date ranges and accident months, why is this the case?
@@ -81,9 +121,17 @@ policy_df%>%
 
 ```{r}
 policy_df%>%
-  mutate(diff = expirydate - as.Date(paste0(ym,"-", xm, "-01")))%>%
+  mutate(diff = as.integer(expirydate - as.Date(paste0(ym,"-", xm, "-01"))))%>%
   group_by(diff)%>%
   tally()%>%
-  arrange(desc(diff))
+  arrange(desc(diff)) 
+```
+
+```{r}
+policy_df%>%
+  mutate(diff = as.integer(expirydate - as.Date(paste0(ym,"-", xm, "-01"))))%>%
+  group_by(diff)%>%
+  ggplot(aes(diff)) + 
+  geom_bar()
 ```
 
