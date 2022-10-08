@@ -1,6 +1,9 @@
 ---
 title: "Exploratory Data Analysis"
-output: html_notebook
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 This R Notebook records the exploratory analysis to fulfil the part 1 requirements of the ACTL4305 Assignment
@@ -18,18 +21,32 @@ source("00 source.R")
 load("00 envr/Compulsory/ass_copy.R")
 load("00 envr/Compulsory/policy_df.R")
 load("00 envr/Compulsory/policy_history_df.R")
-
 ```
 
-# On a property historical basis (ignoring policy instance)
-## Define variable types
+# Clean data for plotting purposes
 ```{r}
 num_vars <- names(policy_history_df)[sapply(policy_history_df, is.numeric)]
 logical_vars <- names(policy_history_df)[sapply(policy_history_df, is.logical)]
 factor_vars <- names(policy_history_df)[sapply(policy_history_df, is.factor)]
 date_vars <- names(policy_history_df)[sapply(policy_history_df, is.Date)]
+
+na_flag_vars<- c("building_age", "building_type", "construction_walls", 
+                 "construction_floor")
+
+plot_data <- policy_history_df %>%
+  mutate(claim_prop = as.factor(ifelse(n_claims_prop > 0, TRUE, FALSE)),
+         claim_lossofinc = as.factor(ifelse(n_claims_lossofinc > 0, TRUE, FALSE)),
+         n_claims_prop = as.factor(n_claims_prop),
+         n_claims_lossofinc = as.factor(n_claims_lossofinc)
+         )%>%
+  dplyr::mutate(across(all_of(na_flag_vars), is.na,
+                .names = "{.col}_isna_flag"))%>%
+  rowwise()%>%
+  mutate(na_building = sum(c_across(ends_with("_isna_flag")))==0)%>%
+  select(-all_of(na_flag_vars))
 ```
 
+# On a property historical basis (ignoring policy instances
 ## Number of claims
 ```{r}
 policy_history_df %>%
@@ -58,14 +75,47 @@ policy_history_df %>%
   ggtitle("Number of loss of income claims per property excluding 0 claims") +
   labs(y = "Count", x = "Number of loss of income claims")
 ```
-## Numerical data violin plot
+## Gross incurred
+
 ```{r}
-plot_data <- policy_history_df %>%
-  mutate(claim_prop = as.factor(ifelse(n_claims_prop > 0, TRUE, FALSE)),
-         claim_lossofinc = as.factor(ifelse(n_claims_lossofinc > 0, TRUE, FALSE)),
-         n_claims_prop = as.factor(n_claims_prop),
-         n_claims_lossofinc = as.factor(n_claims_lossofinc)
-         )
+
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>%
+  ggplot(aes(total_grossincurred_lossofinc)) +
+  geom_density()
+
+policy_history_df %>%
+  filter(avgincurred_prop > 0) %>%
+  ggplot(aes(avgincurred_prop)) +
+  geom_density()
+
+```
+
+## Sum Insured
+
+```{r}
+policy_history_df %>%
+  ggplot(aes(median_SI_lossofinc)) +
+  geom_density()
+
+policy_history_df %>%
+  group_by(median_SI_lossofinc) %>%
+  count()
+
+policy_history_df %>%
+  ggplot(aes(median_SI_prop)) +
+  geom_density()
+
+policy_history_df %>%
+  group_by(median_SI_prop) %>%
+  count()
+```
+
+
+## SI violin plot
+```{r}
+
 
 plot_data %>%
   ggplot(aes(x = n_claims_prop, y = median_SI_prop, fill = n_claims_prop)) +
@@ -87,13 +137,6 @@ plot_data %>%
   ylim(0, 1000000)+
   ggtitle("Loss of Income - Sum Insured vs Number of Claims") +
   labs(y = "Sum insured", x = "Number of Loss of Income claims")
-
-plot_data %>%
-  ggplot(aes(x = claim_lossofinc, y = median_SI_lossofinc, fill = claim_lossofinc)) +
-  geom_violin(draw_quantiles = 0.5)+
-  ylim(0, 1000000)+
-  ggtitle("Loss of Income - Sum Insured vs Claim Filed") +
-  labs(y = "Sum insured", x = "Loss of Income Claim Filed")
 
 ```
 
@@ -120,7 +163,495 @@ plot_data %>%
 plot_data %>%
   ggplot(aes(median_SI_prop, avgincurred_prop, color = total_grossincurred_prop, size = total_grossincurred_prop)) +
   geom_point(alpha = 0.3) +
+  xlim(0,5000000) +
+  ylim(0,200000)
+
+plot_data %>%
+  ggplot(aes(median_SI_lossofinc, avgincurred_lossofinc, color = total_grossincurred_lossofinc, size = total_grossincurred_lossofinc)) +
+  geom_point(alpha = 0.3)
+
+plot_data %>%
+  ggplot(aes(median_SI_lossofinc, avgincurred_lossofinc, color = total_grossincurred_lossofinc, size = total_grossincurred_lossofinc)) +
+  geom_point(alpha = 0.3) +
   xlim(0,10000000) +
   ylim(0,200000)
+```
+
+## Relationship between prop and loss of income claims
+```{r}
+plot_data %>%
+  ggplot(aes(avgincurred_lossofinc, avgincurred_prop)) +
+  geom_point(alpha = 0.3) + 
+  scale_x_log10()+
+  scale_y_log10()
+
+plot_data %>%
+  ggplot(aes(total_grossincurred_lossofinc, total_grossincurred_prop)) +
+  geom_point(alpha = 0.3) + 
+  scale_x_log10()+
+  scale_y_log10()
+
+
+plot_data %>%
+  filter(LossofIncome_cover = TRUE) %>%
+  group_by(n_claims_prop, n_claims_lossofinc) %>%
+  count(n_claims_prop, n_claims_lossofinc) %>%
+	ggplot(mapping = aes(x = n_claims_prop, y = n_claims_lossofinc)) +
+	geom_tile(mapping = aes(fill = n))
+
+```
+
+```{r}
+plot_data %>%
+  filter(LossofIncome_cover == TRUE & n_claims_prop != 0 & n_claims_lossofinc != 0) %>%
+  group_by(n_claims_prop, n_claims_lossofinc) %>%
+  count(n_claims_prop, n_claims_lossofinc) %>%
+	ggplot(mapping = aes(x = n_claims_prop, y = n_claims_lossofinc)) +
+	geom_tile(mapping = aes(fill = n))
+```
+```{r}
+ass_copy %>%
+  group_by(LossofIncome_cover) %>%
+  summarise(both = sum(grossincurred_prop > 0 & grossincurred_lossofinc > 0, na.rm = TRUE),
+            only_prop = sum(grossincurred_prop > 0 & grossincurred_lossofinc == 0, na.rm = TRUE),
+            only_lossofinc = sum(grossincurred_prop == 0 & grossincurred_lossofinc >0, na.rm = TRUE),
+            no_claim = sum(grossincurred_prop == 0 & grossincurred_lossofinc == 0, na.rm = TRUE))
+```
+
+
+## Investigating level of cover vs SI and claim behaviour
+```{r}
+plot_data %>%
+  ggplot(aes(median_SI_prop, avgincurred_prop, color = LossofIncome_cover, size = avgincurred_prop)) +
+  geom_point(alpha = 0.3)
+
+
+plot_data %>%
+  ggplot(aes(median_SI_prop, fill = LossofIncome_cover, color = LossofIncome_cover)) +
+  geom_boxplot()+
+  xlim(0, 5000000)
+
+plot_data %>%
+  filter(avgincurred_prop > 0) %>%
+  ggplot(aes(avgincurred_prop, fill = LossofIncome_cover, color = LossofIncome_cover)) +
+  geom_boxplot()+ 
+  xlim(0, 1000000)
+
+plot_data %>%
+  ggplot(aes(x = n_claims_prop, y = median_SI_prop, fill = n_claims_prop)) +
+  geom_violin(draw_quantiles = 0.5) + 
+  facet_grid(cols = vars(LossofIncome_cover))+
+  ylim(0, 5000000)
+
+```
+
+```{r}
+# 1. Create the histogram plot
+phist <- gghistogram(
+  plot_data, x = "median_SI_prop", 
+  add = "mean", rug = TRUE,
+  fill = "LossofIncome_cover", palette = c("#00AFBB", "#E7B800")
+)
+
+# 2. Create the density plot with y-axis on the right
+# Remove x axis elements
+pdensity <- ggdensity(
+  plot_data, x = "median_SI_prop", 
+  color= "LossofIncome_cover", palette = c("#00AFBB", "#E7B800"),
+  alpha = 0
+) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)), position = "right")  +
+  theme_half_open(11, rel_small = 1) +
+  rremove("x.axis")+
+  rremove("xlab") +
+  rremove("x.text") +
+  rremove("x.ticks") +
+  rremove("legend")
+
+# 3. Align the two plots and then overlay them.
+aligned_plots <- align_plots(phist, pdensity, align="hv", axis="tblr")
+ggdraw(aligned_plots[[1]]) + draw_plot(aligned_plots[[2]])
+```
+
+```{r}
+
+# 1. Create the histogram plot
+phist <- gghistogram(
+  plot_data, x = "avgincurred_prop", 
+  add = "mean", rug = TRUE,
+  fill = "LossofIncome_cover", palette = c("#00AFBB", "#E7B800")
+)
+
+# 2. Create the density plot with y-axis on the right
+# Remove x axis elements
+pdensity <- ggdensity(
+  plot_data, x = "avgincurred_prop", 
+  color= "LossofIncome_cover", palette = c("#00AFBB", "#E7B800"),
+  alpha = 0
+) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.05)), position = "right")  +
+  theme_half_open(11, rel_small = 1) +
+  rremove("x.axis")+
+  rremove("xlab") +
+  rremove("x.text") +
+  rremove("x.ticks") +
+  rremove("legend")
+
+# 3. Align the two plots and then overlay them.
+aligned_plots <- align_plots(phist, pdensity, align="hv", axis="tblr")
+ggdraw(aligned_plots[[1]]) + draw_plot(aligned_plots[[2]])
+```
+
+
+# Categorical Variables (by Andrew)
+```{r}
+
+policy_df %>%
+  ggplot(aes(state)) +
+  geom_bar()
+```
+
+```{r}
+policy_history_df %>%
+  ggplot(aes(riskpostcode)) +
+  geom_bar()
+
+policy_history_df %>%
+  ggplot(aes(occupation_risk)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  ggplot(aes(building_age)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  ggplot(aes(building_type)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  ggplot(aes(construction_walls)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  ggplot(aes(construction_floor)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  filter(sprinkler_type != 0) %>%
+  ggplot(aes(sprinkler_type)) +
+  geom_bar()
+```
+
+```{r}
+
+policy_df %>%
+  ggplot(aes(occupation_risk)) +
+  geom_bar()
+
+
+```
+
+```{r}
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=state,y=total_grossincurred_prop)) +
+  geom_boxplot()
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=state,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,250000))
+
+```
+
+```{r}
+# Al's variables (made by Danny, thanks :D)
+
+plot_data %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=sprinkler_type,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  labs(
+    x = "Sprinkler Type", y = "Total Gross Incurred",
+    title = "Claim Cost against Sprinkler Type",
+    subtitle = "Property Damage Cover"
+  )
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=sprinkler_type,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,80000)) +
+  labs(
+    x = "Sprinkler Type", y = "Total Gross Incurred",
+    title = "Claim Cost against Sprinkler Type",
+    subtitle = "Property Damage Cover"
+  )
+
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=sprinkler_type,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,7500000)) +
+  labs(
+    x = "Sprinkler Type", y = "Total Gross Incurred",
+    title = "Claim Cost against Sprinkler Type",
+    subtitle = "Property Damage Cover"
+  )
+
+```
+
+```{r}
+# Al's Variables Pt2
+#### Building Age ####
+
+policy_history_df$building_age <- 
+  factor(policy_history_df$building_age,levels =
+           c("Before 1960", "1960 - 1980", "After 1980",
+             "Greater Than 20 Years", "Less Than 20 Years", "Less than 2 Years"))
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=building_age,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,400000)) +
+  scale_x_discrete(guide = guide_axis(n.dodge=2))
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=building_age,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,40000)) +
+  scale_x_discrete(guide = guide_axis(n.dodge=2))
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=building_age,y=total_grossincurred_lossofinc)) +
+  geom_boxplot(outlier.color = NA) +
+  scale_y_continuous(trans = "log10") +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) +
+  labs(
+    x = "Building Age", y = "Total Gross Incurred",
+    title = "Claim Cost against Building Age",
+    subtitle = "Income Loss Cover"
+  )
+
+
+#### Building Type ####
+
+policy_history_df$building_type <- 
+  factor(policy_history_df$building_type,levels =
+           c("Warehouse low rise", "Tilt up Concrete low rise", "Medium rise",
+             "High rise", "Other"))
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=building_type,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,300000)) +
+  labs(
+    x = "Building Type", y = "Total Gross Incurred",
+    title = "Claim Cost against Building Type",
+    subtitle = "Income Loss Cover"
+  )
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=building_type,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  scale_y_continuous(trans = "log10")
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=building_type,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,100000))
+
+
+#### Construction Walls ####
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=construction_walls,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,150000)) +
+  scale_x_discrete(guide = guide_axis(n.dodge=2))
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=construction_walls,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  scale_y_continuous(trans = "log10") +
+  scale_x_discrete(guide = guide_axis(n.dodge=2)) +
+  labs(
+    x = "Wall Construction", y = "Total Gross Incurred",
+    title = "Claim Cost against Wall Construction",
+    subtitle = "Property Damage Cover"
+  )
+
+#### Construction Floor ####
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=construction_floor,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() + 
+  coord_cartesian(ylim=c(0,100000)) +
+  labs(
+    x = "Floor Construction", y = "Total Gross Incurred",
+    title = "Claim Cost against Floor Construction",
+    subtitle = "Income Loss Cover"
+  )
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=construction_floor,y=total_grossincurred_prop)) +
+  geom_boxplot() + 
+  coord_cartesian(ylim=c(0,100000))
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=construction_floor,y=total_grossincurred_prop)) +
+  geom_boxplot() + 
+  scale_y_continuous(trans = "log10")
+```
+
+```{r}
+# Danny variables
+
+#### Occupation Risk ####
+
+plot_data %>%
+  filter(total_grossincurred_lossofinc > 0) %>%
+  ggplot(aes(x=occupation_risk,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,100000)) +
+  labs(x= "Occupation Risk", y="Total Gross Incurred",
+       title= "Total Gross Incurred Claims by Occupation Risk",
+       subtitle= "Income Loss Cover")
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=occupation_risk,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  scale_y_continuous(trans = "log10") +
+    labs(x= "Occupation Risk", y="Total Gross Incurred (log scaled)",
+       title= "Total Gross Incurred Claims by Occupation Risk",
+       subtitle= "Property Damage Cover")
+
+```
+
+```{r}
+
+plot_data %>%
+  filter(total_grossincurred_lossofinc > 0) %>% 
+  ggplot(aes(x=state,y=total_grossincurred_lossofinc)) +
+  geom_boxplot() +
+  coord_cartesian(ylim=c(0,100000)) +
+  labs(x= "State", y="Total Gross Incurred",
+       title= "Total Gross Incurred Claims by State",
+       subtitle= "Income Loss Cover")
+
+plot_data %>%
+  filter(total_grossincurred_prop > 0) %>% 
+  ggplot(aes(x=state,y=total_grossincurred_prop)) +
+  geom_boxplot() +
+  scale_y_continuous(trans = "log10") +
+  labs(x= "State", y="Total Gross Incurred",
+       title= "Total Gross Incurred Claims by State",
+       subtitle= "Property Damage Cover")
+
+
+```
+
+
+# For postcode 
+```{r}
+#download data from https://www.matthewproctor.com/australian_postcodes
+postcode <- read.csv("00 envr/Compulsory/australian_postcodes.csv", header = T)
+policy_history_df$riskpostcode <- as.numeric(as.character(policy_history_df$riskpostcode))
+
+# merge with policy_history_df
+policy_history_dflocations <- left_join(policy_history_df, postcode, by = c("riskpostcode" = "postcode"))
+
+# prepare shapefile
+gpclibPermit()
+amap <- readOGR(
+  dsn = "00 envr/Compulsory/",
+  layer = "AUS_2021_AUST_GDA2020",
+  verbose = FALSE
+)
+amap@data$id = rownames(amap@data)
+amap.points = fortify(amap, region='id')
+amap.df = join(amap.points, amap@data, by='id')
+
+```
+
+```{r}
+# plot of avg incurred
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=avgincurred_prop)) +
+  coord_equal() +
+  theme_void() +
+  labs(title="Heatmap of Average Incurred Claims by Postcode", subtitle = "Property Damage Cover")
+  
+
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=avgincurred_lossofinc)) +
+  coord_equal() +
+  theme_void() +
+  labs(title="Heatmap of Average Incurred Claims by Postcode", subtitle = "Income Loss Cover")
+
+```
+
+```{r}
+# plot of SI
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=median_SI_lossofinc)) +
+  coord_equal()
+
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=median_SI_prop)) +
+  coord_equal()
+```
+
+```{r}
+# plot of SI
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=n_claims_prop, alpha = 0.3)) +
+  coord_equal()
+
+ggplot() +
+  geom_polygon(data=amap.df, aes(long,lat,group=group)) +
+  geom_path(data=amap.df, aes(long,lat,group=group), color="white") +
+  geom_point(data=policy_history_dflocations, aes(x=long, y=lat, colour=n_claims_lossofinc, alpha = 0.3)) +
+  coord_equal()
 ```
 

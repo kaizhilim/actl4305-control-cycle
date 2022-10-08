@@ -1,0 +1,256 @@
+---
+title: "Exploratory Data Analysis"
+output: html_notebook
+---
+
+This R Notebook records the exploratory analysis to fulfil the part 1 requirements of the ACTL4305 Assignment
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+theme_set(theme_classic())
+options(scipen=999)
+options(digit=3)
+```
+
+```{r, include=FALSE}
+source("00 source.R")
+load("00 envr/Compulsory/ass_copy.R")
+load("00 envr/Compulsory/policy_df.R")
+load("00 envr/Compulsory/policy_history_df.R")
+```
+
+# Functions for plotting
+```{r}
+hist_dens <- function(df, variable) {
+  phist <- gghistogram(
+  df , x = variable, 
+  fill = "skyblue4",
+  add = "mean", rug = TRUE
+  )
+  
+  pdensity <- ggdensity(
+    df , x = variable,
+    color = "skyblue4",
+    alpha = 0
+  ) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05)), position = "right")  +
+    theme_half_open(11, rel_small = 1) +
+    rremove("x.axis")+
+    rremove("xlab") +
+    rremove("x.text") +
+    rremove("x.ticks") +
+    rremove("legend")
+  
+  aligned_plots <- align_plots(phist, pdensity, align="hv", axis="tblr")
+  ggdraw(aligned_plots[[1]]) + draw_plot(aligned_plots[[2]])
+}
+```
+
+# Clean data for plotting purposes
+```{r}
+num_vars <- names(policy_history_df)[sapply(policy_history_df, is.numeric)]
+logical_vars <- names(policy_history_df)[sapply(policy_history_df, is.logical)]
+factor_vars <- names(policy_history_df)[sapply(policy_history_df, is.factor)]
+date_vars <- names(policy_history_df)[sapply(policy_history_df, is.Date)]
+
+na_flag_vars<- c("building_age", "building_type", "construction_walls", 
+                 "construction_floor")
+
+plot_data <- policy_history_df %>%
+  mutate(claim_prop = as.factor(ifelse(n_claims_prop > 0, TRUE, FALSE)),
+         claim_lossofinc = as.factor(ifelse(n_claims_lossofinc > 0, TRUE, FALSE)),
+         n_claims_prop = as.factor(n_claims_prop),
+         n_claims_lossofinc = as.factor(n_claims_lossofinc)
+         )%>%
+  mutate(across(all_of(na_flag_vars), is.na,
+                .names = "{.col}_isna_flag"))%>%
+  rowwise()%>%
+  mutate(na_building = sum(c_across(ends_with("_isna_flag")))==0)%>%
+  select(-all_of(na_flag_vars))
+```
+
+# Copy the below !!!!
+
+## Relationship between prop and loss of income claims
+```{r}
+plot_data %>%
+  ggplot(aes(avgincurred_lossofinc, avgincurred_prop)) +
+  geom_point(alpha = 0.3) + 
+  scale_x_log10()+
+  scale_y_log10()
+
+plot_data %>%
+  ggplot(aes(total_grossincurred_lossofinc, total_grossincurred_prop)) +
+  geom_point(alpha = 0.3) + 
+  scale_x_log10()+
+  scale_y_log10()
+
+plot_data %>%
+  filter(LossofIncome_cover = TRUE) %>%
+  group_by(n_claims_prop, n_claims_lossofinc) %>%
+  count(n_claims_prop, n_claims_lossofinc) %>%
+	ggplot(mapping = aes(x = n_claims_prop, y = n_claims_lossofinc)) +
+	geom_tile(mapping = aes(fill = n))
+```
+
+```{r}
+plot_data %>%
+  ggplot(aes(LossofIncome_cover)) +
+  geom_bar()
+
+policy_history_df %>%
+  group_by(LossofIncome_cover == TRUE) %>%
+  summarise(count = n()) %>%
+  mutate(proportion = count/nrow(policy_history_df))
+```
+
+```{r}
+policy_history_df %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  group_by(n_claims_prop) %>%
+  summarise(count = n())
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(n_claims_prop)) +
+  geom_bar()
+
+policy_history_df %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  group_by(n_claims_lossofinc) %>%
+  summarise(count = n())
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(n_claims_lossofinc)) +
+  geom_bar()
+```
+
+```{r}
+policy_history_df %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  group_by(n_claims_prop, n_claims_lossofinc) %>%
+  summarise(count = n())
+```
+
+```{r}
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 0)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 0"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 1)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 1"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 2)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 2"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 3)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 3"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 4)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 4"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 5)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 5"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_lossofinc, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_prop == 6)) + 
+  labs(
+    x = "Loss of Income Claims", y = "Proportion", 
+    title = "Proportion of Loss of Income Claims", subtitle = "Number of Property Claims = 6"
+  )
+```
+
+
+```{r}
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_prop, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_lossofinc == 0)) + 
+  labs(
+    x = "Property Claims", y = "Proportion", 
+    title = "Proportion of Property Claims", subtitle = "Number of Loss of Income Claims = 0"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_prop, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_lossofinc == 1)) + 
+  labs(
+    x = "Property Claims", y = "Proportion", 
+    title = "Proportion of Property Claims", subtitle = "Number of Loss of Income Claims = 1"
+  )
+
+plot_data %>%
+  filter(LossofIncome_cover == TRUE) %>%
+  ggplot(aes(x = n_claims_prop, y = ..prop.., group = 1)) +
+  geom_bar(data = subset(plot_data, n_claims_lossofinc == 2)) + 
+  labs(
+    x = "Property Claims", y = "Proportion", 
+    title = "Proportion of Property Claims", subtitle = "Number of Loss of Income Claims = 2"
+  )
+```
+
+```{r}
+bw = 50000
+plot_data %>%
+  ggplot(aes(x = avgincurred_prop)) +
+  geom_histogram(aes(y = bw * ..density.., fill = "Claim both"), data = subset(plot_data, LossofIncome_cover == TRUE & n_claims_prop != 0 & n_claims_lossofinc != 0), binwidth = bw, alpha = 0.4) + 
+  geom_histogram(aes(y = bw * ..density.., fill = "Other"), data = subset(plot_data, LossofIncome_cover == TRUE & (n_claims_prop == 0 | n_claims_lossofinc == 0)), binwidth = bw, alpha = 0.4, na.rm = T) + 
+  coord_cartesian(xlim = c(0, 1500000)) + 
+  labs(
+    x = "Average Claim Cost", y = "Proportion", 
+    title = "Histogram of Average Claim Cost", subtitle = "Property"
+  ) + 
+  scale_fill_manual(name = "Legend", values = c(2, 3))
+
+bw = 5000
+plot_data %>%
+  ggplot(aes(x = avgincurred_lossofinc)) +
+  geom_histogram(aes(y = bw * ..density.., fill = "Claim both"), data = subset(plot_data, LossofIncome_cover == TRUE & n_claims_prop != 0 & n_claims_lossofinc != 0), binwidth = bw, alpha = 0.4) + 
+  geom_histogram(aes(y = bw * ..density.., fill = "Other"), data = subset(plot_data, LossofIncome_cover == TRUE & (n_claims_prop == 0 | n_claims_lossofinc == 0)), binwidth = bw, alpha = 0.4, na.rm = T) +
+  labs(
+    x = "Average Claim Cost", y = "Proportion", 
+    title = "Histogram of Average Claim Cost", subtitle = "Loss of Income"
+  ) + 
+  scale_fill_manual(name = "Legend", values = c(2, 3))
+```
+
+

@@ -1,0 +1,272 @@
+---
+title: "Exploratory Data Analysis"
+output: html_notebook
+---
+
+This R Notebook records the exploratory analysis to fulfil the part 1 requirements of the ACTL4305 Assignment
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+theme_set(theme_classic())
+options(scipen=999)
+options(digit=3)
+```
+
+
+```{r, include=FALSE}
+source("00 source.R")
+load("00 envr/Compulsory/ass_copy.R")
+load("00 envr/Compulsory/policy_df.R")
+load("00 envr/Compulsory/policy_history_df.R")
+```
+
+# On a property historical basis (ignoring policy instance)
+## Define variable types
+```{r}
+num_vars <- names(policy_history_df)[sapply(policy_history_df, is.numeric)]
+logical_vars <- names(policy_history_df)[sapply(policy_history_df, is.logical)]
+factor_vars <- names(policy_history_df)[sapply(policy_history_df, is.factor)]
+date_vars <- names(policy_history_df)[sapply(policy_history_df, is.Date)]
+```
+
+## Number of claims
+```{r}
+policy_history_df %>%
+  ggplot(aes(n_claims_prop)) +
+  geom_bar() + 
+  ggtitle("Number of property claims per property") +
+  labs(y = "Count", x = "Number of property claims")
+
+policy_history_df %>%
+  filter(n_claims_prop > 0) %>%
+  ggplot(aes(n_claims_prop)) +
+  geom_bar() +
+  ggtitle("Number of property claims per property excluding 0 claims") +
+  labs(y = "Count", x = "Number of property claims")
+
+policy_history_df %>%
+  ggplot(aes(n_claims_lossofinc)) +
+  geom_bar() +
+  ggtitle("Number of loss of income claims per property") +
+  labs(y = "Count", x = "Number of loss of income claims")
+
+policy_history_df %>%  
+  filter(n_claims_lossofinc > 0) %>%
+  ggplot(aes(n_claims_lossofinc)) +
+  geom_bar() + 
+  ggtitle("Number of loss of income claims per property excluding 0 claims") +
+  labs(y = "Count", x = "Number of loss of income claims")
+```
+## Gross incurred
+
+```{r}
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>%
+  ggplot(aes(total_grossincurred_lossofinc)) +
+  geom_density()
+
+policy_history_df %>%
+  filter(total_grossincurred_lossofinc > 0) %>%
+  group_by(total_grossincurred_lossofinc) %>%
+  count()
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>%
+  ggplot(aes(total_grossincurred_prop)) +
+  geom_density()
+
+policy_history_df %>%
+  filter(total_grossincurred_prop > 0) %>%
+  group_by(total_grossincurred_prop) %>%
+  count()
+```
+
+## Sum Insured
+
+```{r}
+policy_history_df %>%
+  ggplot(aes(median_SI_lossofinc)) +
+  geom_density()
+
+policy_history_df %>%
+  group_by(median_SI_lossofinc) %>%
+  count()
+
+policy_history_df %>%
+  ggplot(aes(median_SI_prop)) +
+  geom_density()
+
+policy_history_df %>%
+  group_by(median_SI_prop) %>%
+  count()
+```
+
+
+## SI violin plot
+```{r}
+plot_data <- policy_history_df %>%
+  mutate(claim_prop = as.factor(ifelse(n_claims_prop > 0, TRUE, FALSE)),
+         claim_lossofinc = as.factor(ifelse(n_claims_lossofinc > 0, TRUE, FALSE)),
+         n_claims_prop = as.factor(n_claims_prop),
+         n_claims_lossofinc = as.factor(n_claims_lossofinc)
+         )
+
+plot_data %>%
+  ggplot(aes(x = n_claims_prop, y = median_SI_prop, fill = n_claims_prop)) +
+  geom_violin(draw_quantiles = 0.5) + 
+  ylim(0, 5000000)+
+  ggtitle("Property Cover - Sum Insured vs Number of Claims") +
+  labs(y = "Sum insured", x = "Number of property claims")
+
+plot_data %>%
+  ggplot(aes(x = claim_prop, y = median_SI_prop, fill = claim_prop)) +
+  geom_violin(draw_quantiles = 0.5) + 
+  ylim(0, 5000000)+
+  ggtitle("Property Cover - Sum Insured vs Claim Filed") +
+  labs(y = "Sum insured", x = "Property Claim Filed")
+
+plot_data %>%
+  ggplot(aes(x = n_claims_lossofinc, y = median_SI_lossofinc, fill = n_claims_lossofinc)) +
+  geom_violin(draw_quantiles = 0.5) +
+  ylim(0, 1000000)+
+  ggtitle("Loss of Income - Sum Insured vs Number of Claims") +
+  labs(y = "Sum insured", x = "Number of Loss of Income claims")
+
+plot_data %>%
+  ggplot(aes(x = claim_lossofinc, y = median_SI_lossofinc, fill = claim_lossofinc)) +
+  geom_violin(draw_quantiles = 0.5)+
+  ylim(0, 1000000)+
+  ggtitle("Loss of Income - Sum Insured vs Claim Filed") +
+  labs(y = "Sum insured", x = "Loss of Income Claim Filed")
+
+```
+
+## Numerical data histogram
+
+```{r}
+
+plot_data %>%
+  ggplot(aes(median_SI_prop, fill = n_claims_prop, color = n_claims_prop)) +
+  geom_density(alpha = 0.3)+ 
+  xlim(0, 20000000)
+
+plot_data %>%
+  ggplot(aes(median_SI_lossofinc, fill = n_claims_lossofinc, color = n_claims_lossofinc)) +
+  geom_density(alpha = 0.3)+ 
+  xlim(0, 3000000)
+```
+
+```{r}
+plot_data %>%
+  ggplot(aes(median_SI_prop, avgincurred_prop, color = total_grossincurred_prop, size = total_grossincurred_prop)) +
+  geom_point(alpha = 0.3)
+
+plot_data %>%
+  ggplot(aes(median_SI_prop, avgincurred_prop, color = total_grossincurred_prop, size = total_grossincurred_prop)) +
+  geom_point(alpha = 0.3) +
+  xlim(0,10000000) +
+  ylim(0,200000)
+
+plot_data %>%
+  ggplot(aes(median_SI_lossofinc, avgincurred_lossofinc, color = total_grossincurred_lossofinc, size = total_grossincurred_lossofinc)) +
+  geom_point(alpha = 0.3)
+
+plot_data %>%
+  ggplot(aes(median_SI_lossofinc, avgincurred_lossofinc, color = total_grossincurred_lossofinc, size = total_grossincurred_lossofinc)) +
+  geom_point(alpha = 0.3) +
+  xlim(0,10000000) +
+  ylim(0,200000)
+```
+
+## Relationship between prop and loss of income claims
+```{r}
+plot_data %>%
+  ggplot(aes(avgincurred_lossofinc, avgincurred_prop)) +
+  geom_point(alpha = 0.3) + 
+  xlim(0,100000) +
+  ylim(0, 2000000)
+
+plot_data %>%
+  ggplot(aes(total_grossincurred_lossofinc, total_grossincurred_prop)) +
+  geom_point(alpha = 0.3)
+
+plot_data %>%
+  filter(LossofIncome_cover = TRUE) %>%
+  group_by(n_claims_prop, n_claims_lossofinc) %>%
+  count(n_claims_prop, n_claims_lossofinc) %>%
+	ggplot(mapping = aes(x = n_claims_prop, y = n_claims_lossofinc)) +
+	geom_tile(mapping = aes(fill = n))
+
+
+```
+
+## Investigating level of cover vs SI and claim behaviour
+```{r}
+plot_data %>%
+  ggplot(aes(median_SI_prop, avgincurred_prop, color = LossofIncome_cover, size = avgincurred_prop)) +
+  geom_point(alpha = 0.3)
+
+
+plot_data %>%
+  ggplot(aes(median_SI_prop, fill = LossofIncome_cover, color = LossofIncome_cover)) +
+  geom_boxplot()+
+  xlim(0, 5000000)
+
+plot_data %>%
+  filter(avgincurred_prop > 0) %>%
+  ggplot(aes(avgincurred_prop, fill = LossofIncome_cover, color = LossofIncome_cover)) +
+  geom_boxplot()+ 
+  xlim(0, 1000000)
+
+plot_data %>%
+  ggplot(aes(x = n_claims_prop, y = median_SI_prop, fill = n_claims_prop)) +
+  geom_violin(draw_quantiles = 0.5) + 
+  facet_grid(cols = vars(LossofIncome_cover))+
+  ylim(0, 5000000)
+
+```
+
+# Categorical Variables (by Andrew)
+```{r}
+policy_df %>%
+  ggplot(aes(state)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  ggplot(aes(building_age)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  ggplot(aes(building_type)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  ggplot(aes(construction_walls)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  ggplot(aes(construction_floor)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  #filter(sprinkler_type != 0) %>%
+  ggplot(aes(sprinkler_type)) +
+  geom_bar()
+```
+
+```{r}
+policy_df %>%
+  ggplot(aes(occupation_risk)) +
+  geom_bar()
+```
+

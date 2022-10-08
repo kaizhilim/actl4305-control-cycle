@@ -63,6 +63,13 @@ ass_copy%>%
   )
 ```
 
+```{r}
+ass_copy %>% 
+  group_by(ym) %>%
+  count(building_age) %>%
+  filter(is.na(building_age))
+```
+
 # All variables - number of missing values and unique values
 ```{r}
 data_check <- ass_copy %>%
