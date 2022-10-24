@@ -1,0 +1,2 @@
+For each policy, run the frequency and severity model.
+Script should be executable. Any model evaluation should be done in a Rmd file.
