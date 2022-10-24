@@ -20,15 +20,7 @@ policy_details_distinct<-ass_copy%>%
   # Keep first row 
   distinct(policyno, situation_num, effectdate, expirydate,.keep_all = T)
 
-ass_main <- ass_copy%>%
-  select(-c(riskpostcode, state, building_age, building_type, 
-                 construction_walls, construction_floor, sprinkler_type, 
-                 occupation_risk))%>%
-  left_join(policy_details_distinct%>%
-              select(-c(n, row_count, max_n)), 
-            by = c("policyno", "situation_num", "effectdate", "expirydate"))
-
-policy_sumins_distinct <- ass_main%>%
+policy_sumins_distinct <- ass_copy%>%
   group_by(policyno, situation_num, effectdate, expirydate)%>%
   arrange(desc(ym), desc(xm),
           .by_group = T)%>%
@@ -39,8 +31,8 @@ policy_sumins_distinct <- ass_main%>%
   distinct(policyno, situation_num, effectdate, expirydate,.keep_all = T)
 
 ## 2. Exposure Table
-min_date = min(ass_main$effectdate)
-max_date = max(ass_main$expirydate)
+min_date = min(ass_copy$effectdate)
+max_date = max(ass_copy$expirydate)
 
 tibble_days = tibble(days= 0:difftime(max_date, min_date))
 
@@ -53,6 +45,22 @@ map_dfr(
   geom_line()
 
 weight_date_base = 0.9985
+
+## 3. Generate Data Frames ####
+policy_claims_monthly <- ass_copy%>%
+  select(-c(riskpostcode, state, building_age, building_type, 
+            construction_walls, construction_floor, sprinkler_type, 
+            occupation_risk))%>%
+  
+  # Date Weights
+  mutate(date_weights = weight_date_base ^ as.numeric(
+    difftime(max_date, start, units = "days")))%>%
+  # To add as weights, use 'recipes::importance_weights'
+  mutate(exposure = epy * date_weights)%>%
+  
+  left_join(policy_details_distinct%>%
+              select(-c(n, row_count, max_n)), 
+            by = c("policyno", "situation_num", "effectdate", "expirydate"))
 
 policy_claims<-ass_copy%>%
   select(-c(riskpostcode, state, building_age, building_type, 
@@ -87,6 +95,7 @@ policy_claims<-ass_copy%>%
               select(-c(n, row_count, max_n)),
             by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
   
+  group_by(policyno, situation_num)%>%
   mutate(policy_version = dense_rank(paste(effectdate, expirydate)))%>%
   relocate(policy_version, .after = 'situation_num')%>%
   ungroup()%>%
