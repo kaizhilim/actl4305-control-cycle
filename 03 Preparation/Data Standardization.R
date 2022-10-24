@@ -73,8 +73,10 @@ policy_claims<-ass_copy%>%
   # Sum of elements
   summarise(
     exposure = sum(exposure),
-    grossincurred_prop = sum(grossincurred_prop),
-    grossincurred_lossofinc = sum(grossincurred_lossofinc),
+    claimcount_prop = sum(grossincurred_prop > 0, na.rm = T),
+    claimcount_lossofinc = sum(grossincurred_lossofinc > 0, na.rm = T),
+    grossincurred_prop = sum(grossincurred_prop,  na.rm = T),
+    grossincurred_lossofinc = sum(grossincurred_lossofinc, na.rm = T),
     LossofIncome_cover = any(LossofIncome_cover),
     .groups = 'keep'
   )%>%
@@ -85,7 +87,11 @@ policy_claims<-ass_copy%>%
               select(-c(n, row_count, max_n)),
             by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
   
-  mutate(policy_version = dense_rank(paste(effectdate, expirydate)))
+  mutate(policy_version = dense_rank(paste(effectdate, expirydate)))%>%
+  relocate(policy_version, .after = 'situation_num')%>%
+  ungroup()%>%
+  select(-c(effectdate, expirydate))%>%
+  mutate(building_info_na = is.na(building_age))
   
 save(ass_main, file = "00 envr/Compulsory/ass_main.R")
 save(policy_claims, file = "00 envr/Compulsory/policy_claims.R")

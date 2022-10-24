@@ -26,6 +26,11 @@ ass_copy <- ass_data%>%
   # Simplify occupation
   mutate(occupation_risk = factor(str_sub(occupation, 1, 1)))%>%
   
+  # Simplify values
+  mutate(across(c(suminsured_lossofinc, suminsured_prop,
+                  grossincurred_lossofinc, grossincurred_prop),
+                ~ if_else(. < 10, 0, .)))%>%
+  
   # Remove redundant columns
   select(-property_cover, -occupation) 
 
