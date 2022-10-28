@@ -3,7 +3,8 @@ package_list = c(
   "tidyverse",
   "lubridate",
   "insurancerating",
-  "tidymodels"
+  "tidymodels",
+  "statmod"
 )
 
 new_package_list = package_list[
