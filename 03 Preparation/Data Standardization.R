@@ -1,7 +1,5 @@
 source("00 source.R")
 
-load("00 envr/Compulsory/ass_rfct.R")
-
 ## 1. Standardise Policy Details ####
 policy_details_distinct<-ass_rfct%>%
   group_by(policyno, situation_num, effectdate, expirydate)%>%

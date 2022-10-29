@@ -1,4 +1,4 @@
-ass_refactor <- function(ass_copy, threshold_postcode = 10) {
+ass_refactor <- function(ass_copy, threshold_postcode = 20) {
   ## 1. Explore Dataset Factors ####
   # Note we will assume exposure column is clean
   # First use min exposure of 10, then manually combine

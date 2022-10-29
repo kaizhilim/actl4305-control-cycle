@@ -40,8 +40,6 @@ ass_copy <- ass_data%>%
   # Join Postcode data
   add_postcode_dets()
 
-save(ass_copy, file = "00 envr/Cleaning/ass_copy.R")
-
 # Outliers
 ass_outlier_prop <- ass_copy%>%
   filter(occupation %in% c("O_Other Community Services",
@@ -62,7 +60,7 @@ ass_copy%>%
   slice(1:30)%>%view()
 
 ## 2. Simplify Factors based on Exposure ####
-ass_encoding <- ass_refactor(ass_copy, 10)
+ass_encoding <- ass_refactor(ass_copy, 20)
 save(ass_encoding, file = "00 envr/Cleaning/ass_encoding.R")
 
 ass_rfct <- ass_copy%>%
@@ -85,5 +83,4 @@ stopifnot(!anyNA(ass_rfct$geo_code))
 stopifnot(!anyNA(
   ass_rfct$construction_walls[!is.na(ass_copy$construction_walls)]))
 
-save(ass_rfct, file = "00 envr/Compulsory/ass_rfct.R")
 rm(ass_data, get_au_riskpostcode, add_postcode_dets, ass_refactor)
