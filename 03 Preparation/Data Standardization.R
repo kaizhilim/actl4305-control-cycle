@@ -1,13 +1,13 @@
 source("00 source.R")
 
-load("00 envr/Compulsory/ass_copy.R")
+load("00 envr/Compulsory/ass_rfct.R")
 
 ## 1. Standardise Policy Details ####
-policy_details_distinct<-ass_copy%>%
+policy_details_distinct<-ass_rfct%>%
   group_by(policyno, situation_num, effectdate, expirydate)%>%
   arrange(desc(ym), desc(xm),
           .by_group = T)%>%
-  count(riskpostcode, state, building_age, building_type, 
+  count(geo_code, state, building_age, building_type, 
         construction_walls, construction_floor, sprinkler_type, 
         occupation_risk)%>%
   
@@ -20,7 +20,7 @@ policy_details_distinct<-ass_copy%>%
   # Keep first row 
   distinct(policyno, situation_num, effectdate, expirydate,.keep_all = T)
 
-policy_sumins_distinct <- ass_copy%>%
+policy_sumins_distinct <- ass_rfct%>%
   group_by(policyno, situation_num, effectdate, expirydate)%>%
   arrange(desc(ym), desc(xm),
           .by_group = T)%>%
@@ -31,8 +31,8 @@ policy_sumins_distinct <- ass_copy%>%
   distinct(policyno, situation_num, effectdate, expirydate,.keep_all = T)
 
 ## 2. Exposure Table
-min_date = min(ass_copy$effectdate)
-max_date = max(ass_copy$expirydate)
+min_date = min(ass_rfct$effectdate)
+max_date = max(ass_rfct$expirydate)
 
 tibble_days = tibble(days= 0:difftime(max_date, min_date))
 
@@ -47,8 +47,8 @@ map_dfr(
 weight_date_base = 0.9985
 
 ## 3. Generate Data Frames ####
-policy_claims_monthly <- ass_copy%>%
-  select(-c(riskpostcode, state, building_age, building_type, 
+policy_claims_monthly <- ass_rfct%>%
+  select(-c(geo_code, state, building_age, building_type, 
             construction_walls, construction_floor, sprinkler_type, 
             occupation_risk))%>%
   
@@ -62,8 +62,8 @@ policy_claims_monthly <- ass_copy%>%
               select(-c(n, row_count, max_n)), 
             by = c("policyno", "situation_num", "effectdate", "expirydate"))
 
-policy_claims<-ass_copy%>%
-  select(-c(riskpostcode, state, building_age, building_type, 
+policy_claims<-ass_rfct%>%
+  select(-c(geo_code, state, building_age, building_type, 
             construction_walls, construction_floor, sprinkler_type, 
             occupation_risk,
             suminsured_prop, suminsured_lossofinc, indem_per_grp))%>%
@@ -102,5 +102,4 @@ policy_claims<-ass_copy%>%
   select(-c(effectdate, expirydate))%>%
   mutate(building_info_na = is.na(building_age))
   
-save(ass_main, file = "00 envr/Compulsory/ass_main.R")
 save(policy_claims, file = "00 envr/Compulsory/policy_claims.R")
