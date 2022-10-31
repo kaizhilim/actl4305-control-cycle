@@ -1,5 +1,5 @@
 source("00 source.R")
-load("00 envr/Compulsory/policy_claims.R")
+load("00 envr/Compulsory/policy_claims.Rda")
 
 set.seed(123)
 data_split <- initial_split(policy_claims, prop = 0.8, 

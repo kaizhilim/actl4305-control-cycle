@@ -3,7 +3,7 @@ package_list = c(
   "tidyverse",
   "lubridate",
   "insurancerating",
-  "tidymodels",
+  "rsample",
   "statmod"
 )
 
