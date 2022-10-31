@@ -82,7 +82,7 @@ ass_refactor <- function(ass_copy, threshold_postcode = 20) {
   
   # sa4 requires a bigger threshold
   affected_sa4 <- postcode_encoding_epy%>%
-    filter(epy <threshold_postcode * 2)
+    filter(epy <threshold_postcode * 3)
   
   convert_to_sa4 <- postcode_encoding_epy%>%
     inner_join(affected_sa4%>%
