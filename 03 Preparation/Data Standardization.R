@@ -29,20 +29,20 @@ policy_sumins_distinct <- ass_rfct%>%
   distinct(policyno, situation_num, effectdate, expirydate,.keep_all = T)
 
 ## 2. Exposure Table
-min_date = min(ass_rfct$effectdate)
-max_date = max(ass_rfct$expirydate)
+min_date = min(ass_rfct$start)
+max_date = max(ass_rfct$start)
 
 tibble_days = tibble(days= 0:difftime(max_date, min_date))
 
-# Choose 0.9985 
+# Choose 0.99995 
 map_dfr(
-  c(0.99, seq(0.998, 0.9999, 0.00025)),
+  c(0.99, seq(0.999, 0.9999, 0.0002)),
   ~ tibble_days %>% mutate(base = factor(.x), value = .x ^ days)
 ) %>%
   ggplot(aes(days, value, group = base, color = base)) +
   geom_line()
 
-weight_date_base = 0.9985
+weight_date_base = 0.9996
 
 ## 3. Generate Data Frames ####
 policy_claims_monthly <- ass_rfct%>%
@@ -67,10 +67,9 @@ policy_claims_hasNA<-ass_rfct%>%
             suminsured_prop, suminsured_lossofinc, indem_per_grp))%>%
   
   # Date Weights
+  # To add as weights, use 'recipes::importance_weights'
   mutate(date_weights = weight_date_base ^ as.numeric(
     difftime(max_date, start, units = "days")))%>%
-  # To add as weights, use 'recipes::importance_weights'
-  mutate(exposure = epy * date_weights)%>%
   
   # Policy version
   group_by(policyno, situation_num, effectdate, expirydate)%>%
@@ -78,7 +77,8 @@ policy_claims_hasNA<-ass_rfct%>%
   
   # Sum of elements
   summarise(
-    exposure = sum(exposure),
+    exposure = sum(epy),
+    date_weights = mean(date_weights),
     claimcount_prop = sum(grossincurred_prop > 0, na.rm = T),
     claimcount_lossofinc = sum(grossincurred_lossofinc > 0, na.rm = T),
     grossincurred_prop = sum(grossincurred_prop,  na.rm = T),
