@@ -1,27 +1,18 @@
 source("00 source.R")
-load("00 envr/Compulsory/policy_claims.R")
+load("00 envr/Compulsory/policy_claims.Rda")
 
 library(tweedie)
 library(statmod)
 
+dim(training_data[which(training_data$suminsured_prop > 0), ])
 
-policy_claims_tw = policy_claims %>%
-  mutate(policy)
+tw_prop_profile <- tweedie.profile(grossincurred_prop ~ LossofIncome_cover + riskpostcode + state + 
+                                     building_age + building_type + 
+                                     construction_walls + construction_floor + sprinkler_type + 
+                                     occupation_risk + suminsured_prop + indem_per_grp,
+                                   data = training_data[which(training_data$suminsured_prop > 0), ])
 
-tw_prop_profile <- tweedie.profile(grossincurred_prop ~ 
-                                     riskpostcode + building_type + 
-                                     construction_walls + construction_floor + sprinkler_type +
-                                     occupation_risk + suminsured_prop + LossofIncome_cover,
-                                   data = training_data, do.plot = F, do.ci = F,
-                                   p.vec = seq(1.3, 1.7, by = 0.1), method = "series")
 
-tw_prop <- glm(grossincurred_prop ~ 
-                 riskpostcode + building_type + 
-                 construction_walls + construction_floor + sprinkler_type +
-                 occupation_risk + suminsured_prop + LossofIncome_cover,
-               data = training_data, family = tweedie(var.power = 1.5, link.power = 0))
-
-######################################################################################################################################
 ##### Task: Fit a GLM on the aggregate loss of BC line with assumptions of Tweedie. #####
 # BC
 out1 <- tweedie.profile(ClaimBC~CoverageBC+lnDeductBC+NoClaimCreditBC+
@@ -32,11 +23,6 @@ twBC<-glm(ClaimBC~CoverageBC+lnDeductBC+NoClaimCreditBC+
             TypeCity+TypeCounty+TypeMisc+TypeSchool+TypeTown,
           data=freqinBC,family=tweedie(var.power=out1$xi.max, link.power=0))
 #link.power: index of power link function. link.power=0 produces a log-link. Defaults to the canonical link, which is 1-var.power.
-
-
-
-# FOR GLM INCLUDE WEIGHTS USING EXPOSURE 
-
 
 
 summary(twBC)
@@ -63,3 +49,4 @@ plot(predict(twBC,newdata=doutBC,type = "link"),log(doutBC$ClaimBC+1),
 # test RMSE
 predtw <-predict(twBC,newdata = doutBC,type =  "response")
 tweRMSE   <-sqrt(sum((predtw-doutBC$ClaimBC)^2)/nrow(doutBC))
+

@@ -60,7 +60,7 @@ policy_claims_monthly <- ass_rfct%>%
               select(-c(n, row_count, max_n)), 
             by = c("policyno", "situation_num", "effectdate", "expirydate"))
 
-policy_claims<-ass_rfct%>%
+policy_claims_hasNA<-ass_rfct%>%
   select(-c(geo_code, state, building_age, building_type, 
             construction_walls, construction_floor, sprinkler_type, 
             occupation_risk,
@@ -99,5 +99,23 @@ policy_claims<-ass_rfct%>%
   ungroup()%>%
   select(-c(effectdate, expirydate))%>%
   mutate(building_info_na = is.na(building_age))
+
+## 4. Remove NAs ####
+policy_claims<-policy_claims_hasNA%>%
+  filter(suminsured_prop != 0)%>%
+  mutate(suminsured_lossofinc = if_else(!LossofIncome_cover, 0, 
+                                        suminsured_lossofinc),
+         indem_per_grp = factor(
+           if_else(!LossofIncome_cover, "LoI_NULL", as.character(indem_per_grp))
+         ))%>%
+  # Remove 10 rows of NA
+  filter(!is.na(suminsured_lossofinc) )%>%
+  mutate(across(c("building_type", "building_age", 
+                  "construction_walls", "construction_floor"),
+                ~as_factor(replace_na(as.character(.x), "Unknown")),
+                ))%>%
+  mutate(across(where(is.factor),
+                ~fct_reorder(., exposure),
+  ))
   
-save(policy_claims, file = "00 envr/Compulsory/policy_claims.R")
+save(policy_claims, file = "00 envr/Compulsory/policy_claims.Rda")
