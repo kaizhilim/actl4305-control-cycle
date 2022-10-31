@@ -60,7 +60,7 @@ ass_copy <- ass_data%>%
 #   slice(1:30)%>%view()
 
 ## 2. Simplify Factors based on Exposure ####
-ass_encoding <- ass_refactor(ass_copy, 20)
+ass_encoding <- ass_refactor(ass_copy, 30)
 save(ass_encoding, file = "00 envr/Cleaning/ass_encoding.Rda")
 
 ass_rfct <- ass_copy%>%

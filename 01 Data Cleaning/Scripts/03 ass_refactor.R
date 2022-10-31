@@ -1,4 +1,4 @@
-ass_refactor <- function(ass_copy, threshold_postcode = 20) {
+ass_refactor <- function(ass_copy, threshold_postcode = 30) {
   ## 1. Explore Dataset Factors ####
   # Note we will assume exposure column is clean
   # First use min exposure of 10, then manually combine
@@ -82,7 +82,7 @@ ass_refactor <- function(ass_copy, threshold_postcode = 20) {
   
   # sa4 requires a bigger threshold
   affected_sa4 <- postcode_encoding_epy%>%
-    filter(epy <threshold_postcode * 3)
+    filter(epy <threshold_postcode * 4)
   
   convert_to_sa4 <- postcode_encoding_epy%>%
     inner_join(affected_sa4%>%

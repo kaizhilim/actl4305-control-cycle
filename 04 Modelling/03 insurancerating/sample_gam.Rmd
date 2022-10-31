@@ -311,7 +311,7 @@ burn_unrestricted %>%
 full_dat <- policy_claims%>%
   select(-contains("lossofinc"))
 
-cat_variables <- colnames(full_dat)[c(7:14, 16)]
+cat_variables <- colnames(full_dat)[c(8:15, 17)]
 
 univ_full <- 
   tibble(var_analysis = cat_variables)%>%
@@ -397,7 +397,7 @@ prop_dat <- policy_claims%>%
   filter(!LossofIncome_cover)%>%
   select(-contains("lossofinc"))
 
-prop_cat_variables <- colnames(prop_dat)[c(7:14, 16)]
+prop_cat_variables <- colnames(prop_dat)[c(8:15, 17)]
 
 univ_prop <- 
   tibble(var_analysis = prop_cat_variables)%>%
@@ -511,7 +511,7 @@ prop_loi_dat <- policy_claims%>%
   filter(LossofIncome_cover)%>%
   select(-contains("lossofinc"))
 
-prop_loi_cat_variables <- colnames(prop_loi_dat)[c(7:14, 16)]
+prop_loi_cat_variables <- colnames(prop_loi_dat)[c(8:15, 17)]
 
 univ_prop_loi <- 
   tibble(var_analysis = prop_loi_cat_variables)%>%
