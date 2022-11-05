@@ -2,7 +2,7 @@
 source("00 source.R")
 init_dir = ls()
 
-reload_ass_data = TRUE
+reload_ass_data = FALSE
 
 if(reload_ass_data) {
   source("01 Data Cleaning/Data Cleaning Interface.R")

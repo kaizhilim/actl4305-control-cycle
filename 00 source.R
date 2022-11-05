@@ -13,6 +13,6 @@ new_package_list = package_list[
 
 if(length(new_package_list)) install.packages(new_package_list)
 
-lapply(package_list, library, character.only = T)
+lapply(setdiff(package_list, "keras"), library, character.only = T)
 
 rm(new_package_list)
