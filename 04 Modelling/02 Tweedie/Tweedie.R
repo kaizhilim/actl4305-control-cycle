@@ -10,8 +10,8 @@ source("03 Preparation/03 split_by_LoI.R")
 library(tweedie)
 library(statmod)
 
-training_data_prop <- training_data %>% filter(suminsured_prop > 0)
-training_data_bi <- training_data %>% filter(suminsured_lossofinc > 0)
+training_data_prop <- training_data %>% filter(suminsured_prop > 0) # training_data_prop
+training_data_bi <- training_data %>% filter(suminsured_lossofinc > 0) # training_data_proploi
 # dim(training_data)
 # dim(training_data[which(training_data$LossofIncome_cover == TRUE), ])
 # dim(training_data[which(training_data$suminsured_lossofinc > 0), ])
@@ -34,10 +34,10 @@ glm_tweedie <- function(formula, data = training_data, method = "series") {
 #   construction_walls + construction_floor +
 #   sprinkler_type + occupation_risk,
 
-formula_prop <- grossincurred_prop ~ log(suminsured_prop) +  
-  building_age + building_type + construction_walls + construction_floor +
-  sprinkler_type + occupation_risk + electoraterating +
-  LossofIncome_cover
+formula_prop <- grossincurred_prop ~ log(suminsured_prop) + geo_code +
+  building_age + building_type +
+  construction_walls + construction_floor +
+  sprinkler_type + occupation_risk
 modelprop_tw <- glm_tweedie(formula_prop, data = training_data_prop)
 summary(modelprop_tw)
 
@@ -84,3 +84,25 @@ RMSE(mean(training_data$grossincurred_prop), test_data$grossincurred_prop)
 # R-squared
 1 - sum((tweedie_prop_pred - test_data$grossincurred_prop)^2) / sum((test_data$grossincurred_prop - mean(test_data$grossincurred_prop))^2)
 
+
+"
+For both covers
+1. Train proploi_tw using Analysis_proploi
+2. Evaluate proploi_tw's performance using Assess_proploi
+- select best parameters (p = 1.2 or p=1.5)
+3. Retrain proploi_tw using training_data_proploi, denote proploi_tw_retrain
+- using (p = 1.2 )
+
+1. Train bi_tw using Analysis_proploi
+2. Evaluate bi_tw's performance using Assess_proploi
+3. Retrain bi_tw using training_data_proploi, denote bi_tw_retrain
+
+4. Train interaction model using (proploi_tw_retrain, bi_tw_retrain) on 
+training_data_proploi
+5. Test performance using test_data_proploi
+
+For property only
+1. Train prop_tw using training_data_prop
+2. Test performance using testing_data_prop
+
+"
