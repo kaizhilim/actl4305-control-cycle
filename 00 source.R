@@ -4,7 +4,8 @@ package_list = c(
   "lubridate",
   "insurancerating",
   "rsample",
-  "statmod"
+  "statmod",
+  "keras"
 )
 
 new_package_list = package_list[
@@ -13,3 +14,5 @@ new_package_list = package_list[
 if(length(new_package_list)) install.packages(new_package_list)
 
 lapply(package_list, library, character.only = T)
+
+rm(new_package_list)

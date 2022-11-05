@@ -1,4 +1,5 @@
 ## 00. Environment Management ####
+source("00 source.R")
 init_dir = ls()
 
 reload_ass_data = FALSE
@@ -35,8 +36,9 @@ geo_code_grid =
     threshold_sa4name = threshold_sa3name * sa4name_multiplier
   )
 
-policy_claims_grid = geo_code_interface(geo_code_grid, 
-                                        policy_claims = policy_claims)
+geo_code_grid = geo_code_interface(geo_code_grid, 
+                                   policy_claims = policy_claims)
 
+save(geo_code_grid, file = "00 envr/Compulsory/geo_code_grid.Rda")
 
-rm(list = setdiff(ls(), c(init_dir, 'policy_claims', 'policy_claims_grid')))
+rm(list = setdiff(ls(), c(init_dir, 'policy_claims', 'geo_code_grid')))

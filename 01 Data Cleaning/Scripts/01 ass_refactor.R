@@ -26,6 +26,8 @@ ass_fct_encoding <- function(
         'Other')
     * sprinkler_type = c('0', '>0')
     
+    * indem_per_grp = c('12 mths', '24 mths', '18 mths', '36 mths', '<12 mths')
+    
     * occupation = named vector based on threshold input
   "
   
@@ -53,6 +55,10 @@ ass_fct_encoding <- function(
   # 5. sprinkler_type ####
   sprinkler_type_vec = c('>0', '>0', '>0')
   names(sprinkler_type_vec) = c('1','2','3')
+  
+  # 6. indem_per_grp ####
+  indem_per_grp_vec = c('<12 mths')
+  names(indem_per_grp_vec) = c('UNKNOWN')
   
   #### Automatic Named Vectors ####
   
@@ -115,6 +121,7 @@ ass_fct_encoding <- function(
     "building_age" = building_age_vec,
     "building_type" = building_type_vec,
     "sprinkler_type" = sprinkler_type_vec,
+    "indem_per_grp" = indem_per_grp_vec,
     "occupation" = occupation_output_vec
   )
   
