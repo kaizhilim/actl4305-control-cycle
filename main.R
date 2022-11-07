@@ -22,15 +22,15 @@ if(reload_ass_data) {
   load("00 envr/Compulsory/policy_claims.Rda")
 }
 
-## 3. Geo Code Preparation ####
+## 3. Geo Code Grid Preparation ####
 reload_geo_code_grid = FALSE
 if (reload_geo_code_grid) {
   source("03 Preparation/02 Geo Code Interface.R")
   geo_code_grid = 
     expand_grid(
-      threshold_riskpostcode = seq(10, 50, 5),
-      sa3name_multiplier = seq(1.5, 3, 0.5),
-      sa4name_multiplier = seq(1.5, 3, 0.5)
+      threshold_riskpostcode = seq(10, 50, 10),
+      sa3name_multiplier = c(1.5, 2:4),
+      sa4name_multiplier = 2:5
     )%>%
     transmute(
       threshold_riskpostcode,
@@ -38,8 +38,10 @@ if (reload_geo_code_grid) {
       threshold_sa4name = threshold_sa3name * sa4name_multiplier
     )
   
-  geo_code_grid = geo_code_interface(geo_code_grid, 
-                                     policy_claims = policy_claims)
+  geo_code_grid = geo_code_interface(
+    geo_code_grid, 
+    policy_claims = policy_claims)%>%
+    nest(geo_code_param = threshold_riskpostcode:threshold_sa4name)
   
   save(geo_code_grid, file = "00 envr/Compulsory/geo_code_grid.Rda")
 } else {

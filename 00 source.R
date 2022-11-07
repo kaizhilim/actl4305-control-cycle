@@ -4,8 +4,7 @@ package_list = c(
   "lubridate",
   "insurancerating",
   "rsample",
-  "statmod",
-  "keras"
+  "statmod"
 )
 
 new_package_list = package_list[

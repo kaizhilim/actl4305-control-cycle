@@ -3,76 +3,87 @@ library(themis)
 
 fit_resamples_glm_freq_prop<-function(data_split_prop) {
   
-  ## 0. Validation Set ####
-  training_data_prop <- training(data_split_prop)
+  
+  
+}
+
+
+
+
+
+training_data_prop <- training(data_split_prop)
+testing_data_prop <- testing(data_split_prop)
+
+
+# Property + Loi
+PropLoIClaims<- split_by_LoI(policy_claims, LossofIncome_cover = TRUE, 
+                             example_geo_code)
+
+set.seed(123)
+data_split_proploi <- initial_split(PropLoIClaims, prop = 0.8, 
+                                    strata = has_claim)
+
+training_data_proploi <- training(data_split_proploi)
+testing_data_proploi <- testing(data_split_proploi)
+
+
+#####
+# RUN MODELSSSS
+## 3. The Data Frames are now ready for modelling ####
+# Of course, data splitting would be required
+run_example = FALSE
+if(run_example) {
+  
   set.seed(123)
-  validation_prop <- validation_split(training_data_prop, prop = 0.8,
+  validation_prop <- validation_split(training_data_prop, prop =0.8, 
                                       strata = has_claim)
   
   ## 1. Extract Split Components ####
-  Analysis = analysis(validation_prop$splits[[1]])
-  Assess = assessment(validation_prop$splits[[1]])
+  Analysis_prop = analysis(validation_prop$splits[[1]])
+  Assess_prop = assessment(validation_prop$splits[[1]])
   
-  ## 2. Manual Recipe ####
-  glm_freq_prop_recipe <- 
-    recipe(claimcount_prop ~ exposure + suminsured_prop + geo_code + 
-             building_age + building_type + 
-             construction_walls + construction_floor +
-             sprinkler_type + occupation_risk + 
-             has_claim + date_weights,
-           data = Analysis)%>%
-    update_role(exposure, new_role = "offset")%>%
-    update_role(date_weights, new_role = "weights")%>%
-    update_role(has_claim, new_role = "rebalancing")%>%
-    step_log(suminsured_prop, exposure)%>%
-    step_zv(all_predictors())%>%
-    step_mutate(has_claim = as_factor(has_claim))%>%
-    step_rose(has_claim, seed = 123)%>%
-    step_rm(has_claim)
-  
-  glm_freq_prop_prep <- prep(glm_freq_prop_recipe)
-  glm_freq_prop_baked <- bake(glm_freq_prop_prep, new_data = NULL)
-  
-  ## 3. Model Fitting ####
-
-  ## Poisson
   glm_freq_prop_pois <- glm(
-    formula = formula(glm_freq_prop_prep),
-    data = glm_freq_prop_baked,
+    formula = claimcount_prop ~ log(suminsured_prop) + geo_code +
+      building_age + building_type +
+      construction_walls + construction_floor +
+      sprinkler_type + occupation_risk,
+    data = Analysis_prop,
     family=poisson(link = "log"),
-    offset = exposure, weights = date_weights)
-  ## QuasiPoisson
-  glm_freq_prop_quasipois <- glm(
-    formula = formula(glm_freq_prop_prep),
-    data = glm_freq_prop_baked,
-    family=quasipoisson(link = "log"),
-    offset = exposure, weights = date_weights)
+    offset = log(exposure), weights = date_weights)
   
-  ## Negative Binomial
-  glm_freq_prop_nb<- MASS::glm.nb(
-    update(prep(glm_freq_prop_recipe)%>%formula(), ~. + offset(exposure)),
-    data = glm_freq_prop_baked,
-    weights = date_weights
-  )
+  pred_glm_freq_prop_pois <- Assess_prop%>%
+    add_prediction(glm_freq_prop_pois)
   
-  ## 4. Model Prediction ####
-  glm_freq_prop_assess = bake(glm_freq_prop_prep, new_data = Assess)
-  glm_freq_prop_pred = glm_freq_prop_assess%>%
-    insurancerating::add_prediction(
-      glm_freq_prop_pois, glm_freq_prop_quasipois, glm_freq_prop_nb)
-  
-  chosen_family <- glm_freq_prop_pred%>%
-    summarise(across(starts_with("pred"),
-                     ~sqrt(
-                       mean((.x - claimcount_prop)^2)
-                       )))%>%
-    as_tibble()%>%
-    pivot_longer(cols = everything(),
-                 names_to = "family", values_to = "rmse")%>%
-    mutate(family = str_extract(family, "(?<=_)[^_]*$"))%>%
-    arrange(rmse)%>%
-    slice_head(n = 1)%>%
-    deframe()
-  
-  return(chosen_family)
+  run_proploi_example = FALSE
+  if (run_proploi_example) {
+    
+    set.seed(123)
+    validation_proploi <- validation_split(training_data_proploi, prop =0.5, 
+                                           strata = has_claim)
+    
+    ## 1. Extract Split Components ####
+    Analysis_proploi = analysis(validation_proploi$splits[[1]])
+    Assess_proploi = assessment(validation_proploi$splits[[1]])
+    
+    glm_freq_proploi_pois <- glm(
+      formula = claimcount_proploi ~ log(suminsured_proploi) + geo_code +
+        building_age + building_type +
+        construction_walls + construction_floor +
+        sprinkler_type + occupation_risk,
+      data = Analysis_proploi,
+      family=poisson(link = "log"),
+      offset = log(exposure), weights = date_weights)
+    
+    pred_glm_freq_proploi_pois <- Assess_proploi%>%
+      add_prediction(glm_freq_proploi_pois)
+  }
 }
+
+"
+x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk
+x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk + geo_code
+
+set.seed(123)
+halfhalf_proploi <- vfold_cv(training_data_proploi, v = 2, strata = has_claim)
+
+"
