@@ -41,7 +41,10 @@ if (reload_geo_code_grid) {
   geo_code_grid = geo_code_interface(
     geo_code_grid, 
     policy_claims = policy_claims)%>%
-    nest(geo_code_param = threshold_riskpostcode:threshold_sa4name)
+    nest(geo_code_param = threshold_riskpostcode:threshold_sa4name)%>%
+    filter(n_geo_code < 150)%>%
+    distinct(n_geo_code, .keep_all = T)%>%
+    arrange(n_geo_code)
   
   save(geo_code_grid, file = "00 envr/Compulsory/geo_code_grid.Rda")
 } else {

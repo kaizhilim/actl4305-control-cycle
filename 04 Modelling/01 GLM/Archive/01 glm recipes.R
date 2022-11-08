@@ -10,6 +10,11 @@ fit_resamples_glm_freq_prop<-function(data_split_prop) {
 
 
 
+## 2. Add geo_code
+source("04 Modelling/00 Scripts/01 add_geo_code.R")
+claims_finalized <- claims_finalized%>%
+  add_geo_code(geo_code_encoding_vec)
+
 
 training_data_prop <- training(data_split_prop)
 testing_data_prop <- testing(data_split_prop)

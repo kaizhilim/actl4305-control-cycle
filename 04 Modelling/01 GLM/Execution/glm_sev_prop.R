@@ -1,21 +1,10 @@
 library(tidymodels)
 library(themis)
 
-run_glm_sev_prop <- function(geo_code_vec) {
-  ## 1. Creating Data Split for Modelling ####
-  # Need to separate out Prop vs PropLoI
-  PropSeverity <- policy_claims%>%
-    filter(!LossofIncome_cover, grossincurred_prop > 0)%>%
-    select(-contains(c("lossofinc", "loi", "indem")))%>%
-    filter(suminsured_prop > 0)
-  
+run_glm_sev_prop <- function(training_data_propSev, geo_code_vec) {
   set.seed(123)
-  data_split_prop <- initial_split(PropSeverity, prop = 0.8)
-  
-  ## 0. Validation Set ####
-  training_data_prop <- training(data_split_prop)
-  set.seed(123)
-  validation_prop <- validation_split(training_data_prop, prop = 0.8)
+  validation_propSev <- validation_split(
+    training_data_propSev, prop = 0.8)
   
   ## 1. Extract Split Components ####
   Analysis = analysis(validation_prop$splits[[1]])

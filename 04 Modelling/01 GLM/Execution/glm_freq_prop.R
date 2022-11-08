@@ -1,21 +1,12 @@
 library(tidymodels)
 library(themis)
 
-run_glm_freq_prop <- function(geo_code_vec) {
-  ## 1. Creating Data Split for Modelling ####
-  # Need to separate out Prop vs PropLoI
-  source("03 Preparation/03 split_by_LoI.R")
-  PropClaims <- split_by_LoI(policy_claims, LossofIncome_cover = FALSE,
-                             geo_code_vec)
-  
-  set.seed(123)
-  data_split_prop <- initial_split(PropClaims, prop = 0.8, strata = has_claim)
+run_glm_freq_prop <- function(training_data_prop, geo_code_vec) {
   
   ## 0. Validation Set ####
-  training_data_prop <- training(data_split_prop)
   set.seed(123)
-  validation_prop <- validation_split(training_data_prop, prop = 0.8,
-                                      strata = has_claim)
+  validation_prop <- validation_split(training_data_prop, 
+                                      prop = 0.8, strata = has_claim)
   
   ## 1. Extract Split Components ####
   Analysis = analysis(validation_prop$splits[[1]])
@@ -23,15 +14,17 @@ run_glm_freq_prop <- function(geo_code_vec) {
   
   ## 2. Manual Recipe ####
   glm_freq_prop_recipe <- 
-    recipe(claimcount_prop ~ exposure + suminsured_prop + geo_code + 
+    recipe(claimcount_prop ~ exposure + suminsured_prop +
              building_age + building_type + 
              construction_walls + construction_floor +
              sprinkler_type + occupation_risk + 
-             has_claim + state + date_weights,
+             has_claim + 
+             riskpostcode + state + 
+             date_weights,
            data = Analysis)%>%
     update_role(exposure, new_role = "offset")%>%
-    update_role(date_weights, new_role = "weights")%>%
     update_role(has_claim, new_role = "rebalancing")%>%
+    update_role(riskpostcode, new_role = "gen_geo_code")%>%
     update_role(state, new_role = "new_factors")%>%
     
     ## Logging predictors
@@ -41,7 +34,9 @@ run_glm_freq_prop <- function(geo_code_vec) {
     ## Over-sampling for class imbalance
     step_mutate(has_claim = as_factor(has_claim))%>%
     step_rose(has_claim, seed = 123)%>%
-    step_rm(has_claim)%>%
+    
+    ## Generating geo_code 
+    step_mutate(geo_code = as_factor(geo_code_vec[riskpostcode]))%>%
     
     ## Handling of new levels
     step_mutate(geo_code = fct_drop(geo_code))%>%
@@ -57,13 +52,13 @@ run_glm_freq_prop <- function(geo_code_vec) {
   glm_freq_prop_baked <- bake(glm_freq_prop_prep, new_data = NULL)
   
   ## 3. Model Fitting ####
-  
   ## Poisson
   glm_freq_prop_pois <- glm(
     formula = formula(glm_freq_prop_prep),
     data = glm_freq_prop_baked,
     family=poisson(link = "log"),
     offset = exposure, weights = date_weights)
+  
   ## QuasiPoisson
   glm_freq_prop_quasipois <- glm(
     formula = formula(glm_freq_prop_prep),
@@ -79,8 +74,8 @@ run_glm_freq_prop <- function(geo_code_vec) {
   )
   
   ## 4. Model Prediction ####
-  browser()
   glm_freq_prop_assess = bake(glm_freq_prop_prep, new_data = Assess)
+  
   glm_freq_prop_pred = glm_freq_prop_assess%>%
     insurancerating::add_prediction(
       glm_freq_prop_pois, glm_freq_prop_quasipois, glm_freq_prop_nb)
