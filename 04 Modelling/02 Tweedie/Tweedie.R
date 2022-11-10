@@ -1,11 +1,8 @@
 #### Set Up ####
 
-#source("main.R")
 source("00 source.R")
 load("00 envr/Compulsory/policy_claims.Rda")
 source("03 Preparation/Data Split.R")
-# source("03 Preparation/Scripts/03 geo_code.R")
-# source("03 Preparation/03 split_by_LoI.R")
 
 library(tweedie)
 library(statmod)
