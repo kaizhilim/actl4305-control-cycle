@@ -30,7 +30,9 @@ geo_code_grid_loi <- geo_code_grid_loi%>%
     geo_code_encoding,
     function(geo_code_vec) {
       recipe(has_claim ~ exposure + suminsured_lossofinc + 
-               occupation_risk + date_weights,
+               occupation_risk + 
+               riskpostcode + state +
+               date_weights,
              data = training_data_loi)%>%
         
         ## Over-sampling for class imbalance
@@ -58,7 +60,7 @@ geo_code_grid_loi <- geo_code_grid_loi%>%
         )))
     }))
 
-use_tidymodels = F
+use_tidymodels = FALSE
 if(use_tidymodels){
   ### 3. Modelling Functions ####
   glm_freq_loi_fit <- function(glm_freq_loi_recipe) {

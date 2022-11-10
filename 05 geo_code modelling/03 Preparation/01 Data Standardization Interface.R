@@ -101,17 +101,20 @@ data_standardization_interface <- function(ass_clean_na){
     )%>%
     
     ## Add back in distinct details
-    left_join(policy_details_distinct%>%
-                select(-c(n, row_count, max_n)), 
-              by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
-    left_join(policy_suminsured_prop_distinct%>%
-                select(-c(n, row_count, max_n)),
-              by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
-    left_join(policy_suminsured_lossofinc_distinct%>%
-                select(-c(n, row_count, max_n))%>%
-                mutate(LossofIncome_cover = TRUE),
-              by = c("policyno", "situation_num", "effectdate", "expirydate",
-                     "LossofIncome_cover"))%>%
+    left_join(
+      policy_details_distinct%>%
+        select(-c(n, row_count, max_n)), 
+      by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
+    left_join(
+      policy_suminsured_prop_distinct%>%
+        select(-c(n, row_count, max_n)),
+      by = c("policyno", "situation_num", "effectdate", "expirydate"))%>%
+    left_join(
+      policy_suminsured_lossofinc_distinct%>%
+        select(-c(n, row_count, max_n))%>%
+        mutate(LossofIncome_cover = TRUE),
+      by = c("policyno", "situation_num", "effectdate", "expirydate",
+             "LossofIncome_cover"))%>%
     
     # Add details for geo_code
     add_postcode_dets()%>%

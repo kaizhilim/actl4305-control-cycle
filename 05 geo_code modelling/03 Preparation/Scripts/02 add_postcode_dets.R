@@ -1,5 +1,5 @@
 add_postcode_dets <- function(ass_tmp) {
-  source("03 Preparation/Scripts/01 au_riskpostcode.R")
+  source("05 geo_code modelling/03 Preparation/Scripts/01 au_riskpostcode.R")
   au_riskpostcode<-get_au_riskpostcode(ass_tmp)
   
   ## 1. Ammend Known Postcodes with Issues ####

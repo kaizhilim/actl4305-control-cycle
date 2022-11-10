@@ -6,18 +6,21 @@ reload_ass_data = FALSE
 
 if(reload_ass_data) {
   source("05 geo_code modelling/01 Data Cleaning/Data Cleaning Interface.R")
-  source("05 geo_code modelling/03 Preparation/01 Data Standardization Interface.R")
+  source(
+    "05 geo_code modelling/03 Preparation/01 Data Standardization Interface.R")
   
   ## 1. Data Cleaning ####
   ass_data = read_csv("Assignment Data/Assignment Data.csv")
   ass_clean_na = data_cleaning_interface(ass_data)
-  # save(ass_clean_na, file = "00 envr/Cleaning/ass_clean_na.Rda")
+  save(ass_clean_na, 
+       file = "05 geo_code modelling/00 envr/Cleaning/ass_clean_na.Rda")
   rm(ass_data)
   
   ## 2. Data Standardisation ####
   policy_claims<- data_standardization_interface(ass_clean_na)
   
-  save(policy_claims, file = "05 geo_code modelling/00 envr/Compulsory/policy_claims.Rda")
+  save(policy_claims, 
+       file = "05 geo_code modelling/00 envr/Compulsory/policy_claims.Rda")
 } else {
   load("05 geo_code modelling/00 envr/Compulsory/policy_claims.Rda")
 }
@@ -45,7 +48,8 @@ if (reload_geo_code_grid) {
     distinct(n_geo_code, .keep_all = T)%>%
     arrange(n_geo_code)
   
-  save(geo_code_grid, file = "05 geo_code modelling/00 envr/Compulsory/geo_code_grid.Rda")
+  save(geo_code_grid, 
+       file = "05 geo_code modelling/00 envr/Compulsory/geo_code_grid.Rda")
 } else {
   load("05 geo_code modelling/00 envr/Compulsory/geo_code_grid.Rda")
 }
