@@ -1,17 +1,20 @@
 #### Set Up ####
 
-source("main.R")
 source("00 source.R")
 load("00 envr/Compulsory/policy_claims.Rda")
-#source("03 Preparation/Data Split.R")
-source("03 Preparation/Scripts/03 geo_code.R")
-source("03 Preparation/03 split_by_LoI.R")
+source("03 Preparation/Data Split.R")
 
 library(tweedie)
 library(statmod)
 
-training_data_prop <- training_data %>% filter(suminsured_prop > 0) # training_data_prop
-training_data_bi <- training_data %>% filter(suminsured_lossofinc > 0) # training_data_proploi
+# this creates an interaction data set (i.e. the 20%) that can be used to build the interaction model later
+set.seed(123)
+data_split <- initial_split(training_data, prop = 0.75, strata = LossofIncome_cover)
+training_data <- training(data_split)
+training_data_interaction <- testing(data_split)
+
+training_data_prop <- training_data %>% filter(suminsured_prop > 0) 
+training_data_bi <- training_data %>% filter(suminsured_lossofinc > 0) 
 # dim(training_data)
 # dim(training_data[which(training_data$LossofIncome_cover == TRUE), ])
 # dim(training_data[which(training_data$suminsured_lossofinc > 0), ])
@@ -21,7 +24,7 @@ glm_tweedie <- function(formula, data = training_data, method = "series") {
   profile <- tweedie.profile(formula, data = data, 
                              xi.vec = seq(1.1, 1.9, length = 9), method = method, do.ci = F)
   print(profile$xi.max)
-  model <- glm(formula, data = data, offset = log(exposure), weights = date_weights,
+  model <- glm(formula, data = data, weights = date_weights,
                family = tweedie(var.power = profile$xi.max, link.power = 0))
   return(model)
 }
@@ -29,80 +32,75 @@ glm_tweedie <- function(formula, data = training_data, method = "series") {
 #### Models ####
 
 # Property #
-# formula = claimcount_prop ~ log(suminsured_prop) + geo_code +
-#   building_age + building_type +
-#   construction_walls + construction_floor +
-#   sprinkler_type + occupation_risk,
 
-formula_prop <- grossincurred_prop ~ log(suminsured_prop) + geo_code +
-  building_age + building_type +
+formula_prop <- grossincurred_prop ~ 
+  log(suminsured_prop) + geo_code +
+  building_age + building_type + 
   construction_walls + construction_floor +
   sprinkler_type + occupation_risk
 modelprop_tw <- glm_tweedie(formula_prop, data = training_data_prop)
 summary(modelprop_tw)
 
 # Business Interruption #
-# x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk
-# x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk + geo_code
 
-formula_bi <- grossincurred_lossofinc ~ log(suminsured_lossofinc) + 
-  building_age + building_type + construction_walls + construction_floor +
-  sprinkler_type + occupation_risk + electoraterating #+indem_per_grp
+formula_bi <- grossincurred_lossofinc ~ 
+  log(suminsured_lossofinc) + geo_code +
+  building_age + building_type + 
+  construction_walls + construction_floor +
+  sprinkler_type + occupation_risk
 modelbi_tw <- glm_tweedie(formula_bi, data = training_data_bi)
 summary(modelbi_tw)
 
 # Interaction #
 
-prop_tw <- predict(modelprop_tw, newdata = test_data, type = "response")
-bi_tw <- predict(modelbi_tw, newdata = test_data, type = "response")
-actual <- test_data$grossincurred_prop + test_data$grossincurred_lossofinc
+prop_tw <- predict(modelprop_tw, newdata = training_data_interaction, type = "response")
+bi_tw <- predict(modelbi_tw, newdata = training_data_interaction, type = "response")
 
-model_tw <- glm(actual ~ prop_tw + bi_tw + prop_tw:bi_tw, data = test_data, family = gaussian)
-RMSE(mean(training_data$grossincurred_prop), test_data$grossincurred_prop)
+formula_tw <- grossincurred_prop + grossincurred_lossofinc ~ 
+  prop_tw + bi_tw + 
+  prop_tw:bi_tw
+model_tw <- glm(formula_tw, data = training_data_interaction, family = gaussian)
+summary(model_tw)
 
-#### Results (prop) ####
-
-# Interpret the GLM coefficients and do diagnostic checking of the model.
-plot(modelprop_tw$fitted.values, rstandard(modelprop_tw), 
-     xlab = "Fitted values", ylab = "Standardized deviance residuals",
-     main = "Diagnostic checking: SDR vs FV, Gamma")
-abline(h = 0, col = "red", lty = 2)
-
-qqnorm(rstandard(modelprop_tw))
-qqline(rstandard(modelprop_tw), col = "red")
-
-# Compare the prediction performance of models in the test set.
-plot(predict(modelprop_tw, newdata = test_data, type = "link"), log(test_data$grossincurred_prop + 1),
-     ylab = "Log Claims", xlab = "Log Tweedie Scores")
-abline(0,1)
-
-# test RMSE
-tweedie_prop_pred <- predict(modelprop_tw, newdata = test_data, type = "response")
-tweedie_prop_RMSE <-sqrt(sum((tweedie_prop_pred - test_data$grossincurred_prop)^2) / nrow(test_data))
-RMSE(mean(training_data$grossincurred_prop), test_data$grossincurred_prop)
-
-# R-squared
-1 - sum((tweedie_prop_pred - test_data$grossincurred_prop)^2) / sum((test_data$grossincurred_prop - mean(test_data$grossincurred_prop))^2)
+model_pred_tw <- predict(model_tw, newdata = test_data, type = "response")
+sqrt(sum((model_pred_tw-(test_data$grossincurred_prop+test_data$grossincurred_lossofinc))^2)/nrow(test_data))
 
 
-"
-For both covers
-1. Train proploi_tw using Analysis_proploi
-2. Evaluate proploi_tw's performance using Assess_proploi
-- select best parameters (p = 1.2 or p=1.5)
-3. Retrain proploi_tw using training_data_proploi, denote proploi_tw_retrain
-- using (p = 1.2 )
+# Danny #
 
-1. Train bi_tw using Analysis_proploi
-2. Evaluate bi_tw's performance using Assess_proploi
-3. Retrain bi_tw using training_data_proploi, denote bi_tw_retrain
+model_predictions <- test_data %>%
+  add_prediction(modelprop_tw) %>%
+  add_prediction(modelbi_tw) %>%
+  rename(
+    prop_pred = pred_grossincurred_prop_modelprop_tw,
+    bi_pred = pred_grossincurred_lossofinc_modelbi_tw) %>%
+  mutate(bi_pred = if_else(LossofIncome_cover,bi_pred,0),
+         diff = grossincurred_prop + grossincurred_lossofinc - 
+           prop_pred - bi_pred)
 
-4. Train interaction model using (proploi_tw_retrain, bi_tw_retrain) on 
-training_data_proploi
-5. Test performance using test_data_proploi
+loi_predictions <- model_predictions %>%
+  filter(LossofIncome_cover)
+  
 
-For property only
-1. Train prop_tw using training_data_prop
-2. Test performance using testing_data_prop
+no_loi_predictions <- model_predictions %>%
+  filter(!LossofIncome_cover)
 
-"
+interaction_model <- glm(
+  diff ~ bi_pred:prop_pred,
+  data = loi_predictions,
+  family = gaussian)
+
+final_pred_tw <- no_loi_predictions %>%
+  mutate(interaction = 0) %>%
+  union(loi_predictions %>%
+          mutate(interaction = predict(interaction_model,
+                                       newdata= loi_predictions,
+                                       type = "response"))
+  )
+
+final_pred_tw %>%
+  mutate(error = 
+           (grossincurred_prop + grossincurred_lossofinc -
+              (prop_pred * bi_pred + interaction))^2) %>%
+  summarise(MSE = mean(error),
+            RMSE = sqrt(mean(error)))

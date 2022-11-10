@@ -305,6 +305,8 @@ burn_unrestricted %>%
 
 ## Full Data Set
 
+Have both LoI and Proper
+
 ### Property Claims
 
 ```{r}
