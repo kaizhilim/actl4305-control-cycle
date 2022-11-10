@@ -10,3 +10,4 @@ test_data <- testing(data_split)
 
 set.seed(123)
 cv_set <- vfold_cv(training_data, v = 10, strata = LossofIncome_cover)
+
