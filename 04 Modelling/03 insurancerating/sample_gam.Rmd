@@ -1,0 +1,308 @@
+---
+title: "Insurancerating Package Demonstration"
+output: html_notebook
+---
+
+This Notebook demonstrates the use of the `insurancerating` package. The package helps to implement GLMs by executing all steps needed to construct a risk premium from the data. 
+
+It provides a data driven strategy for the construction of tariff classes in P&C insurance. 
+
+The goal is to **bin the continuous factors**, to then produce categorical risk factors which capture the effect of the covariate on the response in an accurate way, while being easy to use in a generalized linear model (GLM).
+
+
+```{r setup, include = FALSE}
+proj_dir = rprojroot::find_rstudio_root_file()
+knitr::opts_knit$set(root.dir = proj_dir)
+```
+
+```{r load_envr, include=FALSE}
+source("00 source.R")
+library(insurancerating)
+load("00 envr/Compulsory/policy_claims.Rda")
+```
+
+Insurancerating requires each row to be each policy. Policy claims already fulfils this requirement. Furthermore, the dataset `policy_claims` is primarily categorical.
+
+---
+
+# Policy Claims Trial Run
+
+
+## Full Data Set
+
+Have both LoI and Proper
+
+### Property Claims
+
+```{r}
+full_dat <- policy_claims%>%
+  select(-contains("lossofinc"))
+
+cat_variables <- colnames(full_dat)[c(8:15, 17)]
+
+univ_full <- 
+  tibble(var_analysis = cat_variables)%>%
+  mutate(univ_df = map(
+    var_analysis, 
+    ~univariate(full_dat,
+           x = vec_ext(.), 
+           nclaims = claimcount_prop,
+           exposure = exposure,
+           severity = grossincurred_prop)))
+```
+
+#### Geocode
+
+There are 6 areas to look out for, especially those with relatively largge exposures
+
+```{r}
+univ_full$univ_df[[1]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+
+univ_full$univ_df[[1]]%>%
+  as_tibble()%>%
+  arrange(desc(average_severity))%>%
+  filter(average_severity > 50000 | risk_premium > 50000, exposure > 5)%>%
+  print()
+```
+
+#### Occupation
+
+```{r}
+univ_full$univ_df[[8]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building age
+
+```{r}
+univ_full$univ_df[[3]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building type 
+
+```{r}
+univ_full$univ_df[[4]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### State
+
+```{r}
+univ_full$univ_df[[2]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction Walls
+
+```{r}
+univ_full$univ_df[[5]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction floor
+
+```{r}
+univ_full$univ_df[[6]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Indenmity
+
+```{r}
+univ_full$univ_df[[9]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+## Only Property Coverage
+
+### Property Claims
+
+```{r}
+prop_dat <- policy_claims%>%
+  filter(!LossofIncome_cover)%>%
+  select(-contains("lossofinc"))
+
+prop_cat_variables <- colnames(prop_dat)[c(8:15, 17)]
+
+univ_prop <- 
+  tibble(var_analysis = prop_cat_variables)%>%
+  mutate(univ_df = map(
+    var_analysis, 
+    ~univariate(prop_dat,
+           x = vec_ext(.), 
+           nclaims = claimcount_prop,
+           exposure = exposure,
+           severity = grossincurred_prop)))
+```
+
+#### Geocode
+
+There are 6 areas to look out for, especially those with relatively largge exposures
+
+```{r}
+univ_prop$univ_df[[1]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+
+univ_prop$univ_df[[1]]%>%
+  as_tibble()%>%
+  arrange(desc(average_severity))%>%
+  filter(average_severity > 50000 | risk_premium > 50000, exposure > 5)%>%
+  print()
+```
+
+#### Occupation
+
+```{r}
+univ_prop$univ_df[[8]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building age
+
+```{r}
+univ_prop$univ_df[[3]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building type 
+
+```{r}
+univ_prop$univ_df[[4]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### State
+
+```{r}
+univ_prop$univ_df[[2]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction Walls
+
+```{r}
+univ_prop$univ_df[[5]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction floor
+
+```{r}
+univ_prop$univ_df[[6]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+
+### Sum Insured Treatment
+
+```{r}
+prop_sumins_freq <- fit_gam(
+  data = prop_dat,
+  nclaims = claimcount_prop,
+  x = suminsured_prop,
+  exposure = exposure
+)
+
+prop_sumins_severity <- fit_gam(
+  data = prop_dat,
+  nclaims = claimcount_prop,
+  x = suminsured_prop,
+  exposure = exposure,
+  amount = grossincurred_prop,
+  model = "severity"
+)
+```
+
+```{r}
+autoplot(prop_sumins_freq, show_observations = T, remove_outliers = 40)
+autoplot(prop_sumins_severity, show_observations = T, remove_outliers=1000000)
+```
+
+## Property + LoI Coverage
+
+### Property Claims
+
+```{r}
+prop_loi_dat <- policy_claims%>%
+  filter(LossofIncome_cover)%>%
+  select(-contains("lossofinc"))
+
+prop_loi_cat_variables <- colnames(prop_loi_dat)[c(8:15, 17)]
+
+univ_prop_loi <- 
+  tibble(var_analysis = prop_loi_cat_variables)%>%
+  mutate(univ_df = map(
+    var_analysis, 
+    ~univariate(prop_loi_dat,
+           x = vec_ext(.), 
+           nclaims = claimcount_prop,
+           exposure = exposure,
+           severity = grossincurred_prop)))
+```
+
+#### Geocode
+
+There are 6 areas to look out for, especially those with relatively largge exposures
+
+```{r}
+univ_prop_loi$univ_df[[1]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+
+univ_prop_loi$univ_df[[1]]%>%
+  as_tibble()%>%
+  arrange(desc(average_severity))%>%
+  filter(average_severity > 50000 | risk_premium > 50000, exposure > 5)%>%
+  print()
+```
+
+#### Occupation
+
+```{r}
+univ_prop_loi$univ_df[[8]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building age
+
+```{r}
+univ_prop_loi$univ_df[[3]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Building type 
+
+```{r}
+univ_prop_loi$univ_df[[4]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### State
+
+```{r}
+univ_prop_loi$univ_df[[2]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction Walls
+
+```{r}
+univ_prop_loi$univ_df[[5]]%>%
+  autoplot(., show_plots = c(1, 2), background = T)
+```
+
+#### Construction floor
+
+```{r}
+univ_prop_loi$univ_df[[6]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+
+#### Indenmity
+
+```{r}
+univ_prop_loi$univ_df[[9]]%>%
+  autoplot(., show_plots = c(1, 2, 3), background = T)
+```
+

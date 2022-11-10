@@ -1,0 +1,340 @@
+---
+title: "EDA"
+output: html_notebook
+---
+
+```{r setup, include = FALSE}
+proj_dir = rprojroot::find_rstudio_root_file()
+knitr::opts_knit$set(root.dir = proj_dir)
+```
+
+```{r, echo = FALSE}
+library(leaflet)
+library(polyCub)
+library(rgdal)
+library(htmlwidgets)
+```
+
+```{r load_envr, include=FALSE}
+source("00 source.R")
+load("00 envr/Compulsory/policy_claims.Rda")
+load("00 envr/Compulsory/ass_rfct.Rda")
+australian_postcodes <- read_csv("00 envr/australian_postcodes.csv")
+
+options(scipen=999)
+```
+
+# Colour Scheme
+
+```{r}
+col1 = "#4B2B74"
+col2 = "#745C94"
+col3 = "#AD84C6"
+col4 = "#6997AF"
+col5 = "#84ACB6"
+col6 = "#6F8183"
+
+colpal = colorRampPalette(c(col1, col2, col3, col4, col5, col6))
+
+```
+
+# Columns
+
+```{r}
+colnames(policy_claims)
+```
+
+# Missing variables
+
+```{r}
+#png(filename="02 EDA/missing.png", width = 800, height = 600)
+gg_miss_upset(ass_rfct, nsets=7, nintersects=NA)
+#dev.off()
+```
+
+# Data prep for maps
+
+```{r}
+# add postcode back in
+ass_rfct_postcode <- ass_rfct %>%
+  dplyr::select(policyno, situation_num, riskpostcode) %>%
+  dplyr::group_by(policyno, situation_num) %>%
+  filter(row_number() == n())
+
+policy_claims_inc_postcode <- left_join(policy_claims, ass_rfct_postcode, by = c("policyno" = "policyno", "situation_num" = "situation_num"))
+
+sa4_postcodes <-australian_postcodes %>%
+  dplyr:: select(c("postcode", "sa4name", "sa4", "Lat_precise", "Long_precise")) %>%
+  mutate(postcode = as.numeric(as.character(postcode))) %>%
+  group_by(postcode) %>%
+  arrange(sa4name) %>%
+  filter(row_number() == 1)
+policy_claims_inc_postcode$riskpostcode <- as.numeric(as.character(policy_claims_inc_postcode$riskpostcode))
+
+policy_claims_sa4 <- left_join(policy_claims_inc_postcode, sa4_postcodes, by = c("riskpostcode" = "postcode")) 
+
+by_state <- policy_claims_sa4 %>%
+  group_by(state) %>%
+  summarise(
+    n_policies = n(),
+    lat = mean(Lat_precise),
+    long = mean(Long_precise),
+    mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
+    mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
+    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
+    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
+    mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
+  )
+by_sa4 <- policy_claims_sa4 %>%
+  group_by(sa4name, sa4) %>%
+  summarise(
+    n_policies = n(),
+    lat = mean(Lat_precise),
+    long = mean(Long_precise),
+    mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
+    mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
+    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
+    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
+    mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
+  )
+
+by_postcode <- policy_claims_sa4 %>%
+  group_by(riskpostcode) %>%
+  summarise(
+    n_policies = n(),
+    lat = mean(Lat_precise),
+    long = mean(Long_precise),
+    mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
+    mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
+    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
+    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
+    mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
+  )
+
+```
+# Map by SA4
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_sa4$mean_prop_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "SA4: ", by_sa4$sa4name, "<br/>", 
+   "Number of policies: ", by_sa4$n_policies, "<br/>", 
+   "Mean Number of Property claims: ", by_sa4$mean_prop_claims, "<br/>", 
+   "Mean Log Gross Property Gross Incurred: ", by_sa4$mean_prop_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_sa4) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircleMarkers(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~sqrt(mean_prop_claims)*60,
+    color = ~pal(mean_prop_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_prop_grossincurred,
+            title = "Mean Property Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/PropertyClaimsSA4.html")
+m
+```
+
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_sa4$mean_lossofinc_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "SA4: ", by_sa4$sa4name, "<br/>", 
+   "Number of policies: ", by_sa4$n_policies, "<br/>", 
+   "Mean Number of Loss Of Income claims: ", by_sa4$mean_lossofinc_claims, "<br/>", 
+   "Mean Log Gross Loss Of Income Gross Incurred: ", by_sa4$mean_lossofinc_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_sa4) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircleMarkers(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~sqrt(mean_lossofinc_claims)*200,
+    color = ~pal(mean_lossofinc_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_lossofinc_grossincurred,
+            title = "Mean Loss Of Income Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/Loss Of IncomeClaimsSA4.html")
+m
+
+```
+# Map by State
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_state$mean_prop_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "state: ", by_state$state, "<br/>", 
+   "Number of policies: ", by_state$n_policies, "<br/>", 
+   "Mean Number of Property claims: ", by_state$mean_prop_claims, "<br/>", 
+   "Mean Log Gross Property Gross Incurred: ", by_state$mean_prop_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_state) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircles(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~mean_prop_claims*1500000,
+    color = ~pal(mean_prop_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_prop_grossincurred,
+            title = "Mean Property Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/PropertyClaimsstate.html")
+m
+```
+
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_state$mean_lossofinc_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "state: ", by_state$state, "<br/>", 
+   "Number of policies: ", by_state$n_policies, "<br/>", 
+   "Mean Number of Loss of Income claims: ", by_state$mean_lossofinc_claims, "<br/>", 
+   "Mean Log Gross Loss of Income Gross Incurred: ", by_state$mean_lossofinc_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_state) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircles(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~mean_lossofinc_claims*50000000,
+    color = ~pal(mean_lossofinc_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_lossofinc_grossincurred,
+            title = "Mean Loss of Income Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/Loss of IncomeClaimsstate.html")
+m
+```
+
+# Map by postcode
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_postcode$mean_prop_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "postcode: ", by_postcode$riskpostcode, "<br/>", 
+   "Number of policies: ", by_postcode$n_policies, "<br/>", 
+   "Mean Number of Loss of Income claims: ", by_postcode$mean_prop_claims, "<br/>", 
+   "Mean Log Gross Loss of Income Gross Incurred: ", by_postcode$mean_prop_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_postcode) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircleMarkers(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~sqrt(mean_prop_claims)*20,
+    color = ~pal(mean_prop_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_prop_grossincurred,
+            title = "Mean Loss of Income Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/PropertyClaimspostcode.html")
+m
+```
+
+```{r}
+# prepare colour code
+pal <- colorNumeric(
+  palette = "BuPu", 
+  domain = by_postcode$mean_lossofinc_grossincurred,
+  na.color = NA)
+
+# prepare tooltip
+mytext <- paste(
+   "postcode: ", by_postcode$riskpostcode, "<br/>", 
+   "Number of policies: ", by_postcode$n_policies, "<br/>", 
+   "Mean Number of Loss of Income claims: ", by_postcode$mean_lossofinc_claims, "<br/>", 
+   "Mean Log Gross Loss of Income Gross Incurred: ", by_postcode$mean_lossofinc_grossincurred, sep="") %>%
+  lapply(htmltools::HTML)
+
+# create map
+m <- leaflet(data = by_postcode) %>% 
+  addProviderTiles(providers$CartoDB.Positron) %>% 
+  setView(lat=-27.833, lng=120 , zoom=4) %>%
+  addCircleMarkers(
+    lng = ~ long,
+    lat = ~ lat,
+    radius = ~sqrt(mean_lossofinc_claims)*60,
+    color = ~pal(mean_lossofinc_grossincurred),
+    weight = 1,
+    popup = mytext,
+    opacity = 0.8
+  ) %>%
+  addLegend("bottomleft",
+            pal = pal, values = ~ mean_lossofinc_grossincurred,
+            title = "Mean Loss of Income Log Gross Incurred")
+
+saveWidget(m, file="02 EDA/Loss of IncomeClaimspostcode.html")
+m
+```
+# Sum insured
+```{r}
+policyclaims$
+```
+
