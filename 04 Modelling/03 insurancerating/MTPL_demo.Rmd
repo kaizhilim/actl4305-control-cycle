@@ -1,0 +1,278 @@
+---
+title: "MTPL Demo"
+output: html_notebook
+---
+
+## MTPL demonstration
+
+Following the README instructions on the [github package](https://github.com/MHaringa/insurancerating)
+
+### GAM Techniques
+
+How to fit a GAM 
+
+```{r}
+# Claim frequency 
+age_policyholder_frequency <- 
+  fit_gam(data = MTPL, 
+          nclaims = nclaims, 
+          x = age_policyholder, 
+          exposure = exposure)
+
+# Claim severity 
+age_policyholder_severity <- 
+  fit_gam(data = MTPL, 
+          nclaims = nclaims, 
+          x = age_policyholder, 
+          exposure = exposure, 
+          amount = amount, 
+          model = "severity")
+
+autoplot(age_policyholder_frequency, show_observations = T)
+```
+
+Now, carry out tariff classes for claim frequency. Note frequency here is defined as number of claims total divided by exposure, for each age.
+
+```{r MTPL GAM Freq}
+clusters_freq <- construct_tariff_classes(age_policyholder_frequency)
+clusters_sev <- construct_tariff_classes(age_policyholder_severity)
+
+autoplot(clusters_freq, show_observations = TRUE)
+```
+
+```{r MTPL GAM Severity}
+age_policyholder_severity %>%
+  autoplot(., show_observations = TRUE, remove_outliers = 100000)
+```
+
+### Adding Constructed tariff classes
+
+Add tariff classes for the variable `age_policyholder` to the dataset, and set the base level of the factor to the level with the largest exposure. 
+
+`biggest_reference` specifies the first level of a factor to the level with the largest exposure. Afterwards, sorted by alphabetical ordering. 
+
+In this example, ages (39, 50] has highest exposure.
+
+```{r}
+dat <- MTPL %>%
+  mutate(age_policyholder_freq_cat = clusters_freq$tariff_classes) %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), ~biggest_reference(., exposure)))
+
+glimpse(dat)
+```
+
+GLM Modelling shown below. `rating_factors()` extracts the coefficients in terms of the original levels of the coefficients, rather than the coded variables. 
+
+```{r MTPL GLM Age Freq}
+model_freq1 <- glm(
+  nclaims ~ age_policyholder_freq_cat, 
+  offset = log(exposure), 
+  family = "poisson", data = dat)
+
+model_freq2 <- glm(
+  nclaims ~ age_policyholder_freq_cat + age_policyholder,
+  offset = log(exposure), 
+  family = "poisson", data = dat)
+
+x <- rating_factors(model_freq1, model_freq2) 
+```
+
+Useful in extracting the 
+
+```{r}
+x
+```
+
+### Rating Factor Evaluation
+
+Note how the largest exposure is shown first.
+
+```{r}
+autoplot(x)
+```
+
+Include `model_data` to sort clustering in the original order. Add exposure to also show as a bar graph.
+
+```{r}
+rating_factors(model_freq1, model_freq2, 
+               model_data = dat,
+               exposure = exposure) %>%
+  autoplot(., linetype = T)
+```
+
+### Predictions
+
+`add_prediction` appends predictions to the dataset. We can also evaluate model performance show below: 
+
+```{r}
+dat_pred <- dat %>%
+  add_prediction(model_freq1, model_freq2) 
+
+model_performance(model_freq1, model_freq2) 
+```
+
+### Bootstrapping
+
+To test the variance of the RMSE, compute the RMSE from generated bootstrap replicates. This is mainly for claim severity models, in case the portfolio contains large claim sizes. 
+
+Example below shows the variation of RMSE of the frequency model is low, where the dashed line shows the RMSE of the original fitted model. 
+
+```{r}
+bootstrap_rmse(model_freq1, dat, n = 100, show_progress = FALSE) %>% 
+  autoplot(.)
+```
+
+### Poisson Overdispersion
+
+A dispersion ratio larger than 1 indicates overdispersion, where the observed variance is higher than the variance of the theoretical model. Otherwise, if it is close to 1, a Poisson model fits well.
+
+* p-value < 0.05 indicates overdispersion
+* Overdispersion > 2 indicates a larger problem with data, perhaps outliers
+
+```{r}
+check_overdispersion(model_freq1)
+```
+### Residuals
+
+`check_residuals` standardizes the residuals to be between 0 and 1. This is achieved by a simulation-based approach. 
+
+Detect deviations from the expected distribution, and produce a uniform quantile-quantile plot. The simulated residuals in the QQ plot below show no clear deviation from a Poisson distribution. Note that formal tests almost always yield significant results for the distribution of residuals and visual inspections (e.g. Q-Q plots) are preferable.
+
+
+```{r}
+check_residuals(model_freq1, n_simulations = 1000) %>%
+  autoplot(.)
+```
+
+## MTPL2: Univariate Analysis
+
+Analysing one single variable. An univariate analysis consists in the evaluation of overall claim frequency, severity and risk premium. Its main purpose lies in verifying the experience data reasonableness using previous experience comparison and professional judgement.
+
+`univariate()` shows the basic risk indicators split by the levels of the discrete risk factor:
+
+```{r}
+univariate(
+  MTPL2, 
+  x = area, # discrete risk factor
+  nclaims = nclaims, # number of claims
+  exposure = exposure, 
+  premium = premium, 
+  severity = amount) # loss
+```
+
+The following indicators are calculated:
+
+1. frequency (i.e. frequency = number of claims / exposure)
+2. average_severity (i.e. average severity = severity / number of claims)
+3. risk_premium (i.e. risk premium = severity / exposure = frequency x average severity)
+4. loss_ratio (i.e. loss ratio = severity / premium)
+5. average_premium (i.e. average premium = premium / exposure)
+
+The term risk premium is equivalent to pure premium and burning cost. 
+
+`univariate` ignores missing input arguments. For example, only claim freq is calculated when `premium` and `severity` are unknown. 
+
+```{r}
+univariate(MTPL2, x = area, nclaims = nclaims, exposure = exposure) 
+```
+
+### Visualisations
+
+In `autoplot.univariate()`, `show_plots` defines the plots to show and
+also the order of the plots. The following plots are available:
+
+1.  frequency
+2.  average_severity
+3.  risk_premium
+4.  loss_ratio
+5.  average_premium
+6.  exposure
+7.  severity
+8.  nclaims
+9.  premium
+
+```{r}
+univariate(MTPL2, x = area, nclaims = nclaims, exposure = exposure) %>%
+  autoplot(.)
+
+univariate(MTPL2, x = area, nclaims = nclaims, exposure = exposure) %>%
+  autoplot(., show_plots = c(6,1))
+
+univariate(MTPL2, x = area, nclaims = nclaims, exposure = exposure) %>%
+  autoplot(., show_plots = c(6,1), background = FALSE)
+```
+
+Checking consistency of claim frequencies across years
+
+```{r}
+MTPL2 %>%
+  mutate(year = sample(2016:2019, nrow(.), replace = TRUE)) %>%
+  univariate(., x = area, nclaims = nclaims, 
+           exposure = exposure, by = year) %>%
+  autoplot(., show_plots = 1)
+```
+
+### Histogram
+
+Create a bin for all outliers
+
+```{r}
+histbin(MTPL2, premium, right = 110)
+```
+
+## MTPL Modelling
+
+Below shows model refinement to impose either smoothing to the parameter estimates, or to add restrictions to the parameter estimates. 
+
+```{r Fit dat}
+mod_freq <- glm(nclaims ~ zip + age_policyholder_freq_cat, 
+                offset = log(exposure), 
+                family = "poisson", 
+                data = dat)
+
+mod_sev <- glm(amount ~ bm + zip, 
+               weights = nclaims, 
+               family = Gamma(link = "log"), 
+               data = dat %>% filter(amount > 0))
+
+MTPL_premium <- dat %>%
+  add_prediction(mod_freq, mod_sev) %>%
+  mutate(premium = pred_nclaims_mod_freq * pred_amount_mod_sev)
+
+
+```
+
+Fit a burning model without restrictions. Even though restrictions could be applied to frequency and severity models, it is more appropriate to add restrictions (and smoothing) to the risk premium model.
+
+* Burning cost: the ratio of incurred losses within a specified amount in excess of the theoretical amount of premium it would take only to cover losses.
+
+  * Used to ascertain the rates for EoL Reinsurance
+  * Divide excess loss by the total subject premium
+  
+```{r}
+burn_unrestricted <- glm(premium ~ zip + bm + age_policyholder_freq_cat, 
+                         weights = exposure, 
+                         family = Gamma(link = "log"), 
+                         data = MTPL_premium) 
+```
+
+### Rate Smoothing
+
+Smoothing can be used to reduce the tolerance for rate change. In `smooth_coef()`:
+* `x_cut` is the name of the risk factor with clusters
+* `x_org` is the name of the original risk factor, 
+* `degree` is the order of the polynomial, 
+* `breaks` is a numerical vector with new clusters for `x_org`. 
+
+The smoothed estimates are added as an offset term to the
+model. An offset is just a fixed term added to the linear predictor, therefore if there is already an offset in the model, the offset terms are added together first
+(i.e. offset = log(*a*) + log(*b*) = log(*a*⋅*b*)).
+
+```{r}
+burn_unrestricted %>%
+  smooth_coef(x_cut = "age_policyholder_freq_cat", 
+              x_org = "age_policyholder", 
+              breaks = seq(18, 95, 5)) %>%
+  autoplot()
+```
