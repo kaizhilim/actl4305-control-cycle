@@ -62,12 +62,20 @@ data_standardization_interface <- function(ass_clean_na){
   tibble_days = tibble(days= 0:difftime(max_date, min_date))
   
   # Choose 0.99998
-  # map_dfr(
-  #   c(0.99, seq(0.999, 0.9999, 0.0002)),
-  #   ~ tibble_days %>% mutate(base = factor(.x), value = .x ^ days)
-  # ) %>%
-  #   ggplot(aes(days, value, group = base, color = base)) +
-  #   geom_line()
+  map_dfr(
+    c(0.99, 0.995,seq(0.999, 0.9999, 0.0002)),
+    ~ tibble_days %>% mutate(base = factor(.x), value = .x ^ days)
+  ) %>%
+    ggplot(aes(days, value, group = base, color = base)) +
+    geom_line(lwd = 0.8)+
+    theme_classic()+
+    labs(
+      x = "Recency of Policy (days)",
+      y = "weight",
+      color = bquote(italic(lambda)^"days"),
+      title = "Observation Importance Weight Curve",
+      subtitle = "Exponential decay - function of days before 29th Feb 2022"
+    )
   
   weight_date_base = 0.9998
   

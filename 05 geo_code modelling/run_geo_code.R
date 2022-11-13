@@ -54,5 +54,10 @@ if (reload_geo_code_grid) {
   load("05 geo_code modelling/00 envr/Compulsory/geo_code_grid.Rda")
 }
 
+## 4. GLM for Property Insurance ####
+run_glm_prop = FALSE
+if (run_glm_prop) {
+  source("05 geo_code modelling/04 Modelling/01 GLM/run_glm_prop.R")
+}
 
 rm(list = setdiff(ls(), c(init_dir, 'policy_claims', 'geo_code_grid')))

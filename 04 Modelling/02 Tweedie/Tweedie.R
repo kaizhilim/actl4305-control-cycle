@@ -1,9 +1,5 @@
 #### Set Up ####
 
-source("00 source.R")
-load("00 envr/Compulsory/policy_claims.Rda")
-source("03 Preparation/Data Split.R")
-
 library(tweedie)
 library(statmod)
 

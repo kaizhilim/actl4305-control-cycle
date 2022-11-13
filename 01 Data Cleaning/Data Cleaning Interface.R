@@ -41,23 +41,26 @@ ass_copy <- ass_data%>%
   add_postcode_dets()
 
 # Outliers
-# ass_outlier_prop <- ass_copy%>%
-#   filter(occupation %in% c("O_Other Community Services",
-#                            "D- Electricity, Gas & Water"))%>%
-#   filter(grossincurred_prop >0)%>%
-#   arrange(desc(grossincurred_prop))
-# 
-# view(ass_outlier_prop)
-# 
-# ass_outlier_lossofinc <- ass_copy%>%
-#   arrange(desc(grossincurred_lossofinc))%>%
-#   slice(1:20)
-# 
-# view(ass_outlier_lossofinc)
-# 
-# ass_copy%>%
-#   arrange(desc(grossincurred_prop))%>%
-#   slice(1:30)%>%view()
+view_outleirs = FALSE
+if (view_outleirs) {
+  ass_outlier_prop <- ass_copy%>%
+    filter(occupation %in% c("O_Other Community Services",
+                            "D- Electricity, Gas & Water"))%>%
+    filter(grossincurred_prop >0)%>%
+    arrange(desc(grossincurred_prop))
+
+  view(ass_outlier_prop)
+
+  ass_outlier_lossofinc <- ass_copy%>%
+    arrange(desc(grossincurred_lossofinc))%>%
+    slice(1:20)
+
+  view(ass_outlier_lossofinc)
+
+  ass_copy%>%
+    arrange(desc(grossincurred_prop))%>%
+    slice(1:30)%>%view()
+}
 
 ## 2. Simplify Factors based on Exposure ####
 ass_encoding <- ass_refactor(ass_copy, 30)

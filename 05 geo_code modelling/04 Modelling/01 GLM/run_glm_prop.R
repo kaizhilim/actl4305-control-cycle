@@ -1,4 +1,3 @@
-source("05 geo_code modelling/main.R")
 source("05 geo_code modelling/03 Preparation/03 split_by_LoI.R")
 stopifnot(exists("geo_code_grid"))
 

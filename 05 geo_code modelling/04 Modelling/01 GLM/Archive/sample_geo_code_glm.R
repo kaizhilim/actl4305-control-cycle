@@ -1,6 +1,6 @@
-source("main.R")
-source("03 Preparation/Scripts/03 geo_code.R")
-source("03 Preparation/03 split_by_LoI.R")
+source("05 geo_code modelling/main.R")
+source("05 geo_code modelling/03 Preparation/Scripts/03 geo_code.R")
+source("05 geo_code modelling/03 Preparation/03 split_by_LoI.R")
 
 
 ## 1. Example getting geo_code encoding vector ####
@@ -11,10 +11,7 @@ default_geo_code = generate_geo_encoding(policy_claims)
 ## Or choosing from the parameter grid
 example_geo_code = geo_code_grid$geo_code_encoding[[123]]
 
-
-#########################################
 ## 2. Creating Data Frames for Modelling ####
-########################################
 # Need to separate out Prop vs PropLoI
 PropClaims <- split_by_LoI(policy_claims, LossofIncome_cover = FALSE, 
                            example_geo_code)
@@ -39,7 +36,7 @@ testing_data_proploi <- testing(data_split_proploi)
 
 
 #####
-# RUN MODELSSSS
+# RUN MODELS
 ## 3. The Data Frames are now ready for modelling ####
 # Of course, data splitting would be required
 run_example = FALSE
@@ -89,9 +86,3 @@ if(run_example) {
       add_prediction(glm_freq_proploi_pois)
   }
 }
-
-"
-x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk
-x_lossofinc ~ log(suminsured_lossofinc) + indem_per_grp + occupation_risk + geo_code
-
-"

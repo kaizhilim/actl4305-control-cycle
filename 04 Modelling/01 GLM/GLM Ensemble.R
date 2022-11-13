@@ -1,10 +1,4 @@
 #### Set Up ####
-
-# source("main.R")
-source("00 source.R")
-source("03 Preparation/Data Split.R")
-load("00 envr/Compulsory/policy_claims.Rda")
-
 library(tidymodels)
 library(dplyr)
 library(glmnet)
@@ -118,7 +112,9 @@ model_predictions <- test_data %>%
     bi_freq_NB = pred_claimcount_lossofinc_freqmodelbi_NB,
     prop_freq_pois = pred_claimcount_prop_freqmodelprop,
     prop_freq_NB = pred_claimcount_prop_freqmodelprop_NB) %>%
-  mutate(bi_freq_NB = if_else(LossofIncome_cover,bi_freq_NB,0), # BI frequency and severity is 0 if there is no Loss of Income cover #
+
+  # BI frequency and severity is 0 if there is no Loss of Income cover #
+  mutate(bi_freq_NB = if_else(LossofIncome_cover,bi_freq_NB,0), 
          bi_freq_pois = if_else(LossofIncome_cover,bi_freq_pois,0),
          bi_sev = if_else(LossofIncome_cover,bi_sev,0))
 
@@ -276,7 +272,8 @@ VIP_plot(sevmodelprop,title="Property Severity")
 
 rating_factor_plots <- function(model, index1, index2) {
   model_subset <- model
-  model_subset$coefficients <- model_subset$coefficients[c(1:(index1-1), (index1+1):(index2-1), (index2+1):length(model$coefficients))]
+  model_subset$coefficients <- model_subset$coefficients[
+    c(1:(index1-1), (index1+1):(index2-1), (index2+1):length(model$coefficients))]
   model_ratingfactors <- rating_factors(model_subset) # just an exponential of the coefficient
   print(model_ratingfactors)
   autoplot(model_ratingfactors)

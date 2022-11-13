@@ -13,6 +13,10 @@ new_package_list = package_list[
 
 if(length(new_package_list)) install.packages(new_package_list)
 
-lapply(setdiff(package_list, "keras"), library, character.only = T)
+# Neural Network Packages
+load_nn = FALSE
+if (load_nn) {
+  lapply(setdiff(package_list, "keras"), library, character.only = T)
+}
 
 rm(new_package_list)
