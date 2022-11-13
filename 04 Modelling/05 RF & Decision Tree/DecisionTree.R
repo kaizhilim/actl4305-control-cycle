@@ -21,8 +21,6 @@ library(tidyr)
 library(rpart)
 
 #----------------- DATA PREP -----------------
-set.seed(123)
-
 # creating freq/sev for training data
 training_data_trees_prop <- training_data %>% 
   dplyr:: mutate (
@@ -46,7 +44,7 @@ training_data_trees_loi <- training_data %>%
   dplyr:: select (everything())
 
 # creating freq/sev for test data
-test_data_trees <- test_data %>% 
+test_data_trees_prop <- test_data %>% 
   dplyr:: mutate (
     frequency_prop = claimcount_prop / exposure,
     frequency_lossofinc = replace_na(claimcount_lossofinc / exposure, 0),
@@ -151,6 +149,10 @@ treeSevLOI_pred <- predict(treeSevLOI, newdata = test_data_trees_loi)
 #------------ VARIABLE IMPORTANCE ------------
 
 varImp(treeFreqProp)
+plot(varImp(treeFreqProp))
 varImp(treeFreqLOI)
+plot(varImp(treeFreqLOI))
 varImp(treeSevProp)
+plot(varImp(treeSevProp))
 varImp(treeSevLOI)
+plot(varImp(treeSevLOI))

@@ -1,11 +1,15 @@
 ---
 title: "EDA"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include = FALSE}
 proj_dir = rprojroot::find_rstudio_root_file()
 knitr::opts_knit$set(root.dir = proj_dir)
+setwd("/cloud/project/02 EDA")
+knitr::opts_chunk$set(echo=FALSE)
 ```
 
 ```{r, echo = FALSE}
@@ -13,6 +17,11 @@ library(leaflet)
 library(polyCub)
 library(rgdal)
 library(htmlwidgets)
+library(gridExtra)
+library(ggpubr)
+library(corrplot)
+library(RColorBrewer)
+source("https://raw.githubusercontent.com/janhove/janhove.github.io/master/RCode/sortLvls.R")
 ```
 
 ```{r load_envr, include=FALSE}
@@ -22,11 +31,10 @@ load("00 envr/Compulsory/ass_rfct.Rda")
 australian_postcodes <- read_csv("00 envr/australian_postcodes.csv")
 
 options(scipen=999)
+theme_set(theme_light())
 ```
 
-# Colour Scheme
-
-```{r}
+```{r include=FALSE}
 col1 = "#4B2B74"
 col2 = "#745C94"
 col3 = "#AD84C6"
@@ -38,23 +46,37 @@ colpal = colorRampPalette(c(col1, col2, col3, col4, col5, col6))
 
 ```
 
-# Columns
 
-```{r}
-colnames(policy_claims)
+
+```{r include=FALSE}
+policy_claims <- policy_claims %>%
+  replace_with_na(replace = list(grossincurred_prop = 0,
+                             grossincurred_lossofinc = 0)) %>%
+  mutate(
+    log_grossincurred_prop = log(grossincurred_prop), 
+    log_grossincurred_lossofinc = log(grossincurred_lossofinc),
+    frequency_prop = replace_na(claimcount_prop / exposure, 0),
+    frequency_bi = replace_na(claimcount_lossofinc / exposure, 0),
+    severity_prop = replace_na(grossincurred_prop / claimcount_prop, 0),
+    severity_bi = replace_na(grossincurred_lossofinc / claimcount_lossofinc, 0),
+    log_severity_prop = replace_na(log_grossincurred_prop / claimcount_prop, 0),
+    log_severity_bi = replace_na(grossincurred_lossofinc/ claimcount_lossofinc, 0)
+  )
 ```
 
 # Missing variables
 
-```{r}
-#png(filename="02 EDA/missing.png", width = 800, height = 600)
+The data provided had a large number of missing values, but all of them were either due to not having a loss of income coverage, or that details about the building’s characteristics were simply not collected. Setting them the values as unknowns sufficed to resolve the issue.
+
+```{r }
+###png(filename="02 EDA/missing.##png", width = 800, height = 600)
 gg_miss_upset(ass_rfct, nsets=7, nintersects=NA)
-#dev.off()
+###dev.off
 ```
 
-# Data prep for maps
+# Geographic Location
 
-```{r}
+```{r include=FALSE}
 # add postcode back in
 ass_rfct_postcode <- ass_rfct %>%
   dplyr::select(policyno, situation_num, riskpostcode) %>%
@@ -81,8 +103,8 @@ by_state <- policy_claims_sa4 %>%
     long = mean(Long_precise),
     mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
     mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
-    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
-    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
+    mean_lossofinc_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
     mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
     mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
   )
@@ -94,8 +116,8 @@ by_sa4 <- policy_claims_sa4 %>%
     long = mean(Long_precise),
     mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
     mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
-    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
-    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
+    mean_lossofinc_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
     mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
     mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
   )
@@ -108,14 +130,18 @@ by_postcode <- policy_claims_sa4 %>%
     long = mean(Long_precise),
     mean_prop_SI = mean(suminsured_prop, na.rm = TRUE),
     mean_lossofinc_SI = mean(suminsured_lossofinc, na.rm = TRUE),
-    mean_prop_grossincurred = log(sum(grossincurred_prop, na.rm = TRUE) / sum(grossincurred_prop > 0, na.rm = TRUE)),
-    mean_lossofinc_grossincurred = log(sum(grossincurred_lossofinc, na.rm = TRUE) / sum(grossincurred_lossofinc > 0, na.rm = TRUE)),
+    mean_prop_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
+    mean_lossofinc_grossincurred = mean(log_grossincurred_prop, na.rm = TRUE),
     mean_prop_claims = mean(claimcount_prop, na.rm = TRUE),
     mean_lossofinc_claims = mean(claimcount_lossofinc, na.rm = TRUE)
   )
 
 ```
-# Map by SA4
+
+## Map by SA4
+
+By using geocode, can more easily observe trends such as concentration of claims around CBD regions, particularly in Sydney and ACT whilst maintaining the granularity that can identify differences of different regions within a state. For example, in NSW, majority of claims occur in Sydney region and increases as you move away from CBD
+
 ```{r}
 # prepare colour code
 pal <- colorNumeric(
@@ -138,7 +164,7 @@ m <- leaflet(data = by_sa4) %>%
   addCircleMarkers(
     lng = ~ long,
     lat = ~ lat,
-    radius = ~sqrt(mean_prop_claims)*60,
+    radius = ~mean_prop_claims*180,
     color = ~pal(mean_prop_grossincurred),
     weight = 1,
     popup = mytext,
@@ -148,7 +174,7 @@ m <- leaflet(data = by_sa4) %>%
             pal = pal, values = ~ mean_prop_grossincurred,
             title = "Mean Property Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/PropertyClaimsSA4.html")
+saveWidget(m, file="02 EDA/01 Map By SA4/PropertyClaimsSA4.html")
 m
 ```
 
@@ -174,7 +200,7 @@ m <- leaflet(data = by_sa4) %>%
   addCircleMarkers(
     lng = ~ long,
     lat = ~ lat,
-    radius = ~sqrt(mean_lossofinc_claims)*200,
+    radius = ~mean_lossofinc_claims*2000,
     color = ~pal(mean_lossofinc_grossincurred),
     weight = 1,
     popup = mytext,
@@ -184,11 +210,14 @@ m <- leaflet(data = by_sa4) %>%
             pal = pal, values = ~ mean_lossofinc_grossincurred,
             title = "Mean Loss Of Income Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/Loss Of IncomeClaimsSA4.html")
+saveWidget(m, file="02 EDA/01 Map By SA4/Loss Of IncomeClaimsSA4.html")
 m
 
 ```
-# Map by State
+
+## Map by State
+
+Grouping by state highlights the clear difference of ACT compared to the other states. However, the state feature may not account for differences within a state 
 ```{r}
 # prepare colour code
 pal <- colorNumeric(
@@ -221,7 +250,7 @@ m <- leaflet(data = by_state) %>%
             pal = pal, values = ~ mean_prop_grossincurred,
             title = "Mean Property Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/PropertyClaimsstate.html")
+saveWidget(m, file="02 EDA/03 Map By Postcode/PropertyClaimsstate.html")
 m
 ```
 
@@ -257,11 +286,14 @@ m <- leaflet(data = by_state) %>%
             pal = pal, values = ~ mean_lossofinc_grossincurred,
             title = "Mean Loss of Income Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/Loss of IncomeClaimsstate.html")
+saveWidget(m, file="02 EDA/02 Map By State/Loss of IncomeClaimsstate.html")
 m
 ```
 
-# Map by postcode
+## Map by postcode
+
+Postcode has the most information but suffers from high cardinality and sparsity issues due to low sample size in many of the postcodes
+
 ```{r}
 # prepare colour code
 pal <- colorNumeric(
@@ -294,7 +326,7 @@ m <- leaflet(data = by_postcode) %>%
             pal = pal, values = ~ mean_prop_grossincurred,
             title = "Mean Loss of Income Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/PropertyClaimspostcode.html")
+saveWidget(m, file="02 EDA/03 Map By Postcode/PropertyClaimspostcode.html")
 m
 ```
 
@@ -330,11 +362,613 @@ m <- leaflet(data = by_postcode) %>%
             pal = pal, values = ~ mean_lossofinc_grossincurred,
             title = "Mean Loss of Income Log Gross Incurred")
 
-saveWidget(m, file="02 EDA/Loss of IncomeClaimspostcode.html")
+saveWidget(m, file="02 EDA/03 Map By Postcode/ Loss of IncomeClaimspostcode.html")
 m
 ```
+
 # Sum insured
+
+One of the clearest relationship was where as sum insured increases, the claim cost tends to also increase with this relationship being more pronounced for BI claims.
+By looking at the higher distribution of SI for higher claim counts, we observe that policies with higher sum insured also have a higher claim frequency.
+
 ```{r}
-policyclaims$
+myColors <- brewer.pal(nlevels(as.factor(policy_claims$claimcount_prop)), "BuPu")
+names(myColors) <- levels(policy_claims$claimcount_prop)
+
+##png(file="02 EDA/04 Sum Insured/Sum Insured vs Prop Claim Cost.##png", width=600, height=350)
+policy_claims %>% 
+  mutate(    
+    claimcount_prop = as.factor(claimcount_prop),
+    claimcount_lossofinc = as.factor(claimcount_lossofinc)) %>%
+  filter(grossincurred_prop> 0) %>% 
+  filter(suminsured_prop > 0) %>%
+  ggplot(aes(x = log(suminsured_prop), y = log(grossincurred_prop) / as.numeric(claimcount_prop))) +
+  geom_point(aes(col = claimcount_prop)) +
+  scale_colour_manual(name = "Claim Count", values = myColors, drop = FALSE) +
+  geom_smooth(method = "lm", color = "midnightblue")+
+  xlab("Log Sum Insured") +
+  ylab("Mean Log Claim Cost") +
+  ggtitle("Sum Insured vs Property Claim Cost") +
+  theme(legend.position="bottom")
+##dev.off
+
+##png(file="02 EDA/04 Sum Insured/Sum Insured vs Prop Claim Count.##png", width=600, height=350)
+policy_claims %>%
+  mutate(    
+    claimcount_prop = as.factor(claimcount_prop),
+    claimcount_lossofinc = as.factor(claimcount_lossofinc)) %>%  
+  filter(suminsured_prop > 0) %>%
+  ggplot(aes(x = claimcount_prop, y = log(suminsured_prop))) +
+  geom_violin(aes(fill = claimcount_prop), draw_quantiles = 0.5) +
+  scale_fill_manual(name = "Claim Count", values = myColors, drop = FALSE) +
+  xlab("Claim Count") +
+  ylab("Log Sum Insured") + 
+  ggtitle("Sum Insured vs Property Claim Count") +
+  theme(legend.position="bottom")
+##dev.off
 ```
+
+```{r}
+myColors <- brewer.pal(nlevels(as.factor(policy_claims$claimcount_lossofinc)), "BuPu")
+names(myColors) <- levels(policy_claims$claimcount_lossofinc)
+
+##png(file="02 EDA/04 Sum Insured/Sum Insured vs Loss of Income Claim Count.##png", width=600, height=350)
+policy_claims %>% 
+  mutate(    
+  claimcount_prop = as.factor(claimcount_prop),
+  claimcount_lossofinc = as.factor(claimcount_lossofinc)) %>%
+  filter(grossincurred_lossofinc > 0) %>% 
+  filter(suminsured_lossofinc > 0) %>%
+  ggplot(aes(x = log(suminsured_lossofinc), y = log(grossincurred_lossofinc / as.numeric(claimcount_lossofinc)))) +
+  geom_point(aes(col = claimcount_lossofinc)) +
+  scale_colour_manual(name = "Claim Count", values = myColors, drop = FALSE) +
+  geom_smooth(method = "lm", color = "midnightblue")+
+  xlab("Log Sum Insured") +
+  ggtitle("Sum Insured vs Loss of Income Claim Cost") +
+  ylab("Mean Log Claim Cost") + 
+  theme(legend.position="bottom")
+##dev.off
+
+##png(file="02 EDA/04 Sum Insured/Sum Insured vs Loss of Income Claim Cost.##png", width=600, height=350)
+policy_claims %>%
+    mutate(    
+    claimcount_prop = as.factor(claimcount_prop),
+    claimcount_lossofinc = as.factor(claimcount_lossofinc)) %>%
+  filter(suminsured_lossofinc > 0) %>%
+  ggplot(aes(x = claimcount_lossofinc, y = log(suminsured_lossofinc))) +
+  geom_violin(aes(fill = claimcount_lossofinc), draw_quantiles = 0.5) +
+  scale_fill_manual(name = "Claim Count", values = myColors, drop = FALSE) +
+  xlab("Claim Count") +
+  ylab("Log Sum Insured")+ 
+  ggtitle("Sum Insured vs Loss of Income Claim Count") +
+  theme(legend.position="bottom")
+##dev.off
+```
+
+```{r}
+onlynumeric <- policy_claims %>%
+  dplyr:: select(
+    frequency_prop,
+    severity_prop,
+    frequency_bi,
+    severity_bi
+  )
+
+corr = cor(onlynumeric, method = "pearson")
+
+#png(file="02 EDA/05 Correlation/Corrplot.#png", width=1000, height=600)
+
+corrplot(corr, method="color",   
+         col.lim = c(0,1), 
+         col=brewer.pal(n=10, name="BuPu"),
+         type="lower", order="hclust", 
+         addCoef.col = "black", # Add coefficient of correlation
+         tl.col="black", tl.srt=45, #Text label color and rotation
+         # hide correlation coefficient on the principal diagonal
+         diag=FALSE 
+         )
+
+#dev.off()
+```
+
+# Property Claims - Building Characteristics
+
+Further we can observe different claim experiences for the different building materials with the bars reflecting severity and the line representing frequency. 
+
+Including these variables may help predictive power as there appears to be strong differences in claim experience between levels within the variable. For example, policies with Sprinkler 2 are more likely to make claims that are more frequent and of greater severity.
+
+## Building Age
+
+```{r}
+building_age <- policy_claims %>%
+  group_by(building_age) %>%
+  summarise(
+    n_obs = n(),
+    avg_prop_claim = mean(grossincurred_prop / claimcount_prop, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_prop_no = mean(claimcount_prop),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/06 Property - Building Characteristics/Building_Age.#png", width=600, height= 550)
+coeff <- max(building_age$avg_prop_no) / max(building_age$avg_prop_claim)
+
+avg_prop_noColor <- col4
+avg_prop_claimColor <- col1
+
+ggplot(building_age, aes(x=building_age)) +
+  
+  geom_bar( aes(y=avg_prop_claim), stat="identity", size=.1, fill=avg_prop_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_prop_no / coeff), size=2, color=avg_prop_noColor, group = 1) +
+  geom_text(aes(y=avg_prop_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 2.5) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Building Age") +
+  theme(
+    axis.title.y = element_text(color = avg_prop_noColor),
+    axis.title.y.right = element_text(color = avg_prop_claimColor)
+  ) 
+#dev.off
+```
+
+## Building Type
+
+```{r}
+building_type <- policy_claims %>%
+  group_by(building_type) %>%
+  summarise(
+    n_obs = n(),
+    avg_prop_claim = mean(grossincurred_prop / claimcount_prop, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_prop_no = mean(claimcount_prop),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/06 Property - Building Characteristics/Building_Type.#png", width=600, height= 550)
+coeff <- max(building_type$avg_prop_no) / max(building_type$avg_prop_claim)
+
+avg_prop_noColor <- col4
+avg_prop_claimColor <- col1
+
+ggplot(building_type, aes(x=building_type)) +
+  geom_bar( aes(y=avg_prop_claim), stat="identity", size=.1, fill=avg_prop_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_prop_no / coeff), size=2, color=avg_prop_noColor, group = 1) +
+  geom_text(aes(y=avg_prop_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 2.5) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Building Type") +
+  theme(
+    axis.title.y = element_text(color = avg_prop_noColor),
+    axis.title.y.right = element_text(color = avg_prop_claimColor)
+  ) 
+#dev.off
+```
+## Construction Walls
+```{r}
+construction_walls <- policy_claims %>%
+  group_by(construction_walls) %>%
+  summarise(
+    n_obs = n(),
+    avg_prop_claim = mean(grossincurred_prop / claimcount_prop, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_prop_no = mean(claimcount_prop),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/06 Property - Building Characteristics/Construction_Walls.#png", width=600, height= 550)
+
+coeff <- max(construction_walls$avg_prop_no) / max(construction_walls$avg_prop_claim)
+
+avg_prop_noColor <- col4
+avg_prop_claimColor <- col1
+
+ggplot(construction_walls, aes(x=construction_walls)) +
+  
+  geom_bar( aes(y=avg_prop_claim), stat="identity", size=.1, fill=avg_prop_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_prop_no / coeff), size=2, color=avg_prop_noColor, group = 1) +
+  geom_text(aes(y=avg_prop_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 3) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Construction Walls") +
+  theme(
+    axis.title.y = element_text(color = avg_prop_noColor),
+    axis.title.y.right = element_text(color = avg_prop_claimColor)
+  ) 
+#dev.off
+```
+
+## Construction Floor
+
+```{r}
+construction_floor <- policy_claims %>%
+  group_by(construction_floor) %>%
+  summarise(
+    n_obs = n(),
+    avg_prop_claim = mean(grossincurred_prop / claimcount_prop, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_prop_no = mean(claimcount_prop),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/06 Property - Building Characteristics/Construction_Floor.#png", width=600, height= 550)
+
+coeff <- max(construction_floor$avg_prop_no) / max(construction_floor$avg_prop_claim)
+
+avg_prop_noColor <- col4
+avg_prop_claimColor <- col1
+
+ggplot(construction_floor, aes(x=construction_floor)) +
+  
+  geom_bar( aes(y=avg_prop_claim), stat="identity", size=.1, fill=avg_prop_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_prop_no / coeff), size=2, color=avg_prop_noColor, group = 1) +
+  geom_text(aes(y=avg_prop_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 3) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Construction Floor") +
+  theme(
+    axis.title.y = element_text(color = avg_prop_noColor),
+    axis.title.y.right = element_text(color = avg_prop_claimColor)
+  ) 
+#dev.off
+```
+
+## Sprinkler Type
+
+```{r}
+sprinkler_type <- policy_claims %>%
+  group_by(sprinkler_type) %>%
+  summarise(
+    n_obs = n(),
+    avg_prop_claim = mean(grossincurred_prop / claimcount_prop, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_prop_no = mean(claimcount_prop),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/06 Property - Building Characteristics/Sprinkler.#png", width=600, height= 550)
+
+coeff <- max(sprinkler_type$avg_prop_no) / max(sprinkler_type$avg_prop_claim)
+
+avg_prop_noColor <- col4
+avg_prop_claimColor <- col1
+
+ggplot(sprinkler_type, aes(x=sprinkler_type)) +
+  geom_bar( aes(y=avg_prop_claim), stat="identity", size=.1, fill=avg_prop_claimColor, color="black", alpha=.7) +
+  geom_text(aes(y=avg_prop_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 4) +
+  geom_line(aes(y=avg_prop_no / coeff), size=2, color=avg_prop_noColor, group = 1) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Sprinkler Type") +
+  theme(
+    axis.title.y = element_text(color = avg_prop_noColor),
+    axis.title.y.right = element_text(color = avg_prop_claimColor)
+  ) 
+#dev.off
+```
+# Loss Of Income Claims - Building Characteristics
+
+## Building Age
+
+```{r}
+building_age <- policy_claims %>%
+  group_by(building_age) %>%
+  summarise(
+    n_obs = n(),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_no = mean(claimcount_lossofinc),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+#png(file="02 EDA/07 Loss of Income - Building Characteristics/Building_Age.#png", width=600, height= 550)
+coeff <- max(building_age$avg_lossofinc_no) / max(building_age$avg_lossofinc_claim)
+
+avg_lossofinc_noColor <- col4
+avg_lossofinc_claimColor <- col3
+
+ggplot(building_age, aes(x=building_age)) +
+  
+  geom_bar( aes(y=avg_lossofinc_claim), stat="identity", size=.1, fill=avg_lossofinc_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_lossofinc_no / coeff), size=2, color=avg_lossofinc_noColor, group = 1) +
+  geom_text(aes(y=avg_lossofinc_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 2.5) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Building Age") +
+  theme(
+    axis.title.y = element_text(color = avg_lossofinc_noColor),
+    axis.title.y.right = element_text(color = avg_lossofinc_claimColor)
+  ) 
+#dev.off
+```
+
+## Building Type
+
+```{r}
+building_type <- policy_claims %>%
+  group_by(building_type) %>%
+  summarise(
+    n_obs = n(),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_no = mean(claimcount_lossofinc),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/07 Loss of Income - Building Characteristics/Building_Type.#png", width=600, height= 550)
+
+coeff <- max(building_type$avg_lossofinc_no) / max(building_type$avg_lossofinc_claim)
+
+avg_lossofinc_noColor <- col4
+avg_lossofinc_claimColor <- col3
+
+ggplot(building_type, aes(x=building_type)) +
+  geom_bar( aes(y=avg_lossofinc_claim), stat="identity", size=.1, fill=avg_lossofinc_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_lossofinc_no / coeff), size=2, color=avg_lossofinc_noColor, group = 1) +
+  geom_text(aes(y=avg_lossofinc_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 2.5) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Building Type") +
+  theme(
+    axis.title.y = element_text(color = avg_lossofinc_noColor),
+    axis.title.y.right = element_text(color = avg_lossofinc_claimColor)
+  ) 
+#dev.off
+```
+
+## Construction Walls
+
+```{r}
+construction_walls <- policy_claims %>%
+  group_by(construction_walls) %>%
+  summarise(
+    n_obs = n(),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_no = mean(claimcount_lossofinc),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/07 Loss of Income - Building Characteristics/Construction_Walls.#png", width=600, height= 550)
+
+coeff <- max(construction_walls$avg_lossofinc_no) / max(construction_walls$avg_lossofinc_claim)
+
+avg_lossofinc_noColor <- col4
+avg_lossofinc_claimColor <- col3
+
+ggplot(construction_walls, aes(x=construction_walls)) +
+  
+  geom_bar( aes(y=avg_lossofinc_claim), stat="identity", size=.1, fill=avg_lossofinc_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_lossofinc_no / coeff), size=2, color=avg_lossofinc_noColor, group = 1) +
+  geom_text(aes(y=avg_lossofinc_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 3) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Construction Walls") +
+  theme(
+    axis.title.y = element_text(color = avg_lossofinc_noColor),
+    axis.title.y.right = element_text(color = avg_lossofinc_claimColor)
+  ) 
+```
+
+## Construction Floor
+
+```{r}
+construction_floor <- policy_claims %>%
+  group_by(construction_floor) %>%
+  summarise(
+    n_obs = n(),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_no = mean(claimcount_lossofinc),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+
+#png(file="02 EDA/07 Loss of Income - Building Characteristics/Construction_Floor.#png", width=600, height= 550)
+coeff <- max(construction_floor$avg_lossofinc_no) / max(construction_floor$avg_lossofinc_claim)
+
+avg_lossofinc_noColor <- col4
+avg_lossofinc_claimColor <- col3
+
+ggplot(construction_floor, aes(x=construction_floor)) +
+  
+  geom_bar( aes(y=avg_lossofinc_claim), stat="identity", size=.1, fill=avg_lossofinc_claimColor, color="black", alpha=.7) + 
+  geom_line(aes(y=avg_lossofinc_no / coeff), size=2, color=avg_lossofinc_noColor, group = 1) +
+  geom_text(aes(y=avg_lossofinc_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 3) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Construction Floor") +
+  theme(
+    axis.title.y = element_text(color = avg_lossofinc_noColor),
+    axis.title.y.right = element_text(color = avg_lossofinc_claimColor)
+  ) 
+#dev.off
+```
+
+## Sprinkler Type
+
+```{r}
+sprinkler_type <- policy_claims %>%
+  group_by(sprinkler_type) %>%
+  summarise(
+    n_obs = n(),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_claim = mean(grossincurred_lossofinc / claimcount_lossofinc, na.rm = TRUE),
+    avg_lossofinc_no = mean(claimcount_lossofinc),
+    avg_lossofinc_no = mean(claimcount_lossofinc)
+  )
+#png(file="02 EDA/07 Loss of Income - Building Characteristics/Sprinkler.#png", width=600, height= 550)
+coeff <- max(sprinkler_type$avg_lossofinc_no) / max(sprinkler_type$avg_lossofinc_claim)
+
+avg_lossofinc_noColor <- col4
+avg_lossofinc_claimColor <- col3
+
+ggplot(sprinkler_type, aes(x=sprinkler_type)) +
+  geom_bar( aes(y=avg_lossofinc_claim), stat="identity", size=.1, fill=avg_lossofinc_claimColor, color="black", alpha=.7) +
+  geom_text(aes(y=avg_lossofinc_claim, label = paste("n_obs: ", format(n_obs, nsmall = 2))), vjust = 1.5, colour = "white", size = 4) +
+  geom_line(aes(y=avg_lossofinc_no / coeff), size=2, color=avg_lossofinc_noColor, group = 1) +
+  scale_y_continuous(
+    name = "Mean Number of Claims",
+    sec.axis = sec_axis(~.*coeff, name="Mean Claim Size")
+  ) + 
+  ggtitle("Sprinkler Type") +
+  theme(
+    axis.title.y = element_text(color = avg_lossofinc_noColor),
+    axis.title.y.right = element_text(color = avg_lossofinc_claimColor)
+  ) 
+
+#dev.off
+```
+
+# Occupation
+
+For property claims, it can be seen that Gas and Water has significantly poorer claims experience.
+
+```{r}
+occupations <- sort(as.character(unique(policy_claims$occupation_risk)))
+temp <- occupations[17]
+occupations[17] <- occupations[18]
+occupations[18] <- temp
+reorg_occupation <- policy_claims %>%
+  dplyr:: mutate(
+    occupation_risk = factor(occupation_risk, occupations),
+    mean = as.factor(round(ave(log_grossincurred_prop, as.factor(occupation_risk), FUN=mean)))
+  )
+##png(file="02 EDA/08 Occupations/PropertyOccs.#png", width=1200, height= 550)
+reorg_occupation%>%
+  group_by(occupation_risk)%>%
+  mutate(mean=mean(log_grossincurred_prop, na.rm=TRUE))%>%
+  ggplot(aes(factor(occupation_risk),log_grossincurred_prop))+
+  geom_boxplot(aes(fill=mean)) + 
+  scale_fill_gradientn(colors = brewer.pal(9, "BuPu")) +
+  xlab("Occupation Risk") +
+  ylab("Average Log Gross Incurred") +
+  ggtitle("Property - Occupation Risk") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+##dev.off()
+```
+
+Due to how the nature of an industry operates would affect business intnerruption claims, industries such as C - Manufacturing, G - Retail and L Rental for Business Services have higher average gross incurred
+
+```{r}
+occupations <- sort(as.character(unique(policy_claims$occupation_risk)))
+temp <- occupations[17]
+occupations[17] <- occupations[18]
+occupations[18] <- temp
+reorg_occupation <- policy_claims %>%
+  dplyr:: mutate(
+    occupation_risk = factor(occupation_risk, occupations),
+    mean = as.factor(round(ave(log_grossincurred_lossofinc, as.factor(occupation_risk), FUN=mean)))
+  )
+
+##png(file="02 EDA/08 Occupations/LossofincOccs.#png", width=1200, height= 550)
+reorg_occupation%>%
+  group_by(occupation_risk)%>%
+  mutate(mean=mean(log_grossincurred_lossofinc, na.rm=TRUE))%>%
+  ggplot(aes(factor(occupation_risk),log_grossincurred_lossofinc))+
+  geom_boxplot(aes(fill=mean)) + 
+  scale_fill_gradientn(colors = brewer.pal(9, "BuPu")) +
+  xlab("Occupation Risk") +
+  ylab("Average Log Gross Incurred") +
+  ggtitle("Loss of Income - Occupation Risk") +
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) 
+##dev.off()
+```
+
+# Interaction
+
+```{r}
+ass_rfct %>%
+  summarise(both = sum(grossincurred_prop > 0 & grossincurred_lossofinc > 0, na.rm = TRUE),
+            only_prop = sum(grossincurred_prop > 0 & grossincurred_lossofinc == 0, na.rm = TRUE),
+            only_lossofinc = sum(grossincurred_prop == 0 & grossincurred_lossofinc >0, na.rm = TRUE),
+            no_claim = sum(grossincurred_prop == 0 & grossincurred_lossofinc == 0, na.rm = TRUE))
+```
+
+## Property Claim Cost vs BI Claim Cost
+
+Clear positive trend between Property and BI claim cost.
+
+```{r}
+myColors <- brewer.pal(nlevels(as.factor(policy_claims$indem_per_grp)), "BuPu")
+names(myColors) <- levels(policy_claims$indem_per_grp)
+
+##png(file="02 EDA/09 Interaction/GrossIncurred.#png", width=600, height= 500)
+policy_claims %>%
+  ggplot(aes(x = log_grossincurred_prop / claimcount_prop, y = log_grossincurred_lossofinc / claimcount_lossofinc)) +
+  geom_point(aes(col = indem_per_grp))+
+  scale_colour_manual(name = "Indemnity period (BI)", values = myColors, drop = FALSE) +
+  xlab("Mean Log Claim Cost (Prop)") +
+  ylab("Mean Log Claim Cost (BI)") +
+  ggtitle("Property Claim Cost vs BI Claim Cost for Policies That Incurred Both Losses") +
+  geom_smooth(method = glm, col = col1)
+##dev.off()
+```
+
+## Distribution of polciies with BI cover vs without
+
+```{r}
+policy_claims %>%
+  ggplot(aes(x = LossofIncome_cover, y = log_grossincurred_prop)) +
+  geom_boxplot()
+```
+
+## Exploring Claims Made Simultaneously vs Rest
+
+By comparing gross incurred for policies that make both claims vs the others, we see that when both claims are made in conjunction, a policy tends to make larger claims
+
+```{r}
+claim_type <- ass_rfct %>%
+  mutate(
+    claim_type = case_when(
+        grossincurred_prop > 0 & grossincurred_lossofinc > 0 ~ "Both Prop and BI Claim",
+        grossincurred_prop > 0 & grossincurred_lossofinc == 0 ~ "Only Prop Claim",
+        grossincurred_prop == 0 & grossincurred_lossofinc >0 ~ "Only BI Claim",
+        grossincurred_prop == 0 & grossincurred_lossofinc == 0 ~ "No Claim",
+        is.na(grossincurred_lossofinc) & grossincurred_prop == 0 ~ "No Claim",
+        is.na(grossincurred_lossofinc) & grossincurred_prop > 0 ~ "Only Prop Claim"),
+    claim_type = factor(claim_type, levels=c("No Claim",  "Both Prop and BI Claim", "Yeet", "Only Prop Claim","Only BI Claim"))
+  )
+
+myColors <- brewer.pal(nlevels(as.factor(claim_type$claim_type)), "BuPu")
+names(myColors) <- levels(claim_type$claim_type)
+
+#png(file="02 EDA/09 Interaction/Claim Type - Property.#png", width=600, height= 500)
+claim_type %>%
+  filter(grossincurred_prop > 0) %>%
+  ggplot(aes(x = log(grossincurred_prop), col = claim_type, fill = claim_type)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(name = "Claim Type", values = myColors)+
+  scale_colour_manual(name = "Claim Type", values = myColors) +
+  xlab("Log Property Claim Size")
+
+#dev.off()
+
+#png(file="02 EDA/09 Interaction/Claim Type - BI.#png", width=600, height= 500)
+claim_type %>%
+  filter(grossincurred_lossofinc > 0) %>%
+  ggplot(aes(x = log(grossincurred_lossofinc), col = claim_type, fill = claim_type)) +
+  scale_fill_manual(name = "Claim Type", values = myColors)+
+  scale_colour_manual(name = "Claim Type", values = myColors)+
+  geom_density(alpha = 0.5) +
+  xlab("Log BI Claim Size")
+
+#dev.off()
+```
+
 

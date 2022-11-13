@@ -20,8 +20,6 @@ library(ROCR)
 library(tidyr)
 
 #----------------- DATA PREP -----------------
-set.seed(123)
-
 # creating freq/sev for training data
 training_data_trees_prop <- training_data %>% 
   dplyr:: mutate (
@@ -165,9 +163,13 @@ plot(rfSevLOI, main = "Loss of Income Severity - mtry Tuning")
 #------------ VARIABLE IMPORTANCE ------------
 
 varImp(rfFreqProp)
+plot(varImp(rfFreqProp))
 varImp(rfFreqLOI)
+plot(varImp(rfFreqLOI))
 varImp(rfSevProp)
+plot(varImp(rfSevProp))
 varImp(rfSevLOI)
+plot(varImp(rfSevLOI))
 
 #rfFreqProp_varimp <- randomForest(
 #  formula = formula_freqprop, 
