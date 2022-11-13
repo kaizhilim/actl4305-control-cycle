@@ -109,6 +109,7 @@ For example, [Prairiewood](https://www.abs.gov.au/census/find-census-data/quicks
 
 EDA was then carried out, revealing features which had strong trends and relationships with the claim experience. For example, a comparison of the claim size distribution revealed that when both claims were made in conjunction, the policy was more likely to make a larger claim. ​
 
+Explore further the results of the EDA [here](02%20EDA/EDA.html).
 ## Modelling
 
 ### Cross Validation Approach
@@ -140,6 +141,11 @@ Key variables for property claims included high-risk areas concentrated in coast
 ![VIP-LoI-Freq](06%20Model%20Output%20Images/VIP%20LoI%20Freq.png)
 
 Business interruption lines were highly dependent on occupations at risk of workplace accidents, primarily in the retail and energy sector, but also shared commonalities in significant variables with property claims. Ultimately, these variable importance factors can be translated into rating factors for IAG’s commercial pricing.​
+### Interaction Effect
+
+The association between the property and business interruption lines was captured by the GLM interaction model. The interaction is divided into three terms: frequency, severity and aggregate loss interaction terms. The coefficients of all the terms were found to be statistically significant, and the interaction effect was found to be positive. This means that when both coverages were purchased, the policy was more likely to make a larger claim. 
+
+The reasoning and proof behind the three interaction terms used can be found in [GLM Interaction Term Proof](06%20Model%20Output%20Images/GLM%20Interaction%20Term%20Proof.pdf).
 
 ## Recommendations and Limitations​
 
